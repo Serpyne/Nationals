@@ -1,0 +1,87 @@
+{
+	"id": "TS-chopped",
+	"cameraMasks": [
+		{"type": "sector", "center": [294, 250], "radius": 125, "startAngle": 50, "endAngle": 310, "colour": [0, 255, 0]},
+		{"type": "rect", "x": 300, "y": 355, "w": 40, "h": 32, "colour": [0, 255, 0]},
+		{"type": "rect", "x": 294, "y": 180, "w": 100, "h": 140, "colour": [0, 255, 0]}
+	],
+	"addresses": {
+		"motors": [25, 26, 28, 27],
+		"dribbler": 30,
+		"tofs": null,
+        "captureTof": 87,
+		"switchLeft": 22,
+		"switchRight": 10
+	},
+	"wheelPositions": [0, 1, 2, 3],
+	"tofPositions": [36, 108, 180, 252, 324],
+	"cameraOrientation": 180,
+	"anglePolyCoefficients": {
+		"x5": -0.00000002124,
+        "x4": 0.000008243,
+        "x3": -0.0009405,
+        "x2": 0.01646,
+        "x1": 3.225
+    },
+	"OLDanglePolyCoefficients": {
+		"x5": -0.00000002124,
+        "x4": 0.000008243,
+        "x3": -0.0009267,
+        "x2": 0.01556,
+        "x1": 3.204
+    },
+    "speedBias": {"forwardDamping": 0.15, "sideDamping": 1.0},
+    "directionBias": 50000000,
+    "blindnessTimer": 200,
+    "targetGoal": "yellow",
+    "driveSpeed": 0.85,
+    "topSpeed": 1.0,
+    "dribbleSpeed": 0.75,
+    "maintainOrientationTurnSpeed": 0.025,
+    "centerSpeed": 0.5,
+    "ExposureTime": 10000,
+    "Saturation": 3.0,
+    "colours": {
+        "ball": [
+            0,
+            234,
+            198,
+            3,
+            255,
+            255
+        ],
+        "blue": [
+            106,
+            245,
+            50,
+            111,
+            255,
+            86
+        ],
+        "yellow": [
+            25,
+            222,
+            47,
+            40,
+            255,
+            120
+        ]
+    },
+    "settings": {
+        "ball": {
+            "maximum_span": 66.8,
+            "minimum_conglomerate": 5,
+            "minimum_contour_size": 1
+        },
+        "blue": {
+            "maximum_span": 0.1,
+            "minimum_conglomerate": 1,
+            "minimum_contour_size": 4
+        },
+        "yellow": {
+            "maximum_span": 43.3,
+            "minimum_conglomerate": 1,
+            "minimum_contour_size": 3
+        }
+    }
+}
