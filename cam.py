@@ -17,11 +17,18 @@ from masks import *
 def normalise(angle_degrees: float) -> float:
     return (angle_degrees + 180) % 360 - 180
 def angle_lerp(alpha: float, beta: float, t: float) -> float:
-    return alpha + normalise(beta - alpha) * t
+    return normalise(alpha + normalise(beta - alpha) * t)
 def lerp(a: float, b: float, t: float) -> float:
     return a + (b - a) * t
 def clamp(x, a: float = -1, b: float = 1) -> float:
     return min(max(x, a), b)
+def sign(x) -> int:
+    if x < 0:
+        return -1
+    elif x == 0:
+        return 0
+    elif x > 0:
+        return 1
     
 def convert_hsv(hsv: tuple, format_: str = "rgb") -> tuple:
     """
@@ -61,7 +68,6 @@ class Conglomerator:
                 last_span = 0
             else:
                 last_span = -cv2.pointPolygonTest(contour, previous_center, True)
-                # ~ last_span = math.sqrt(pow(center[0] - previous_center[0], 2) + pow(center[1] - previous_center[1], 2))
                 
             if last_span > maximum_span: continue
             
@@ -107,7 +113,7 @@ class AsyncCam:
             controls={
                 "FrameRate": 120.05,
                 "Contrast": 1.0,
-                "ScalerCrop": (1980//2, 528, 1980, 1980)
+                "ScalerCrop": (990, 528, 1980, 1980)
             },
         ))
         self.stream.controls.ExposureTime = self.controls["ExposureTime"]
@@ -135,9 +141,12 @@ class AsyncCam:
         self.debug: bool = False
         
         self.angle: float = None
-        self.true_angle: float = None
         self.distance: float = None
-        self.true_distance: float = None
+        
+        self.yellow_angle: float = None
+        self.yellow_distance: float = None
+        self.blue_angle: float = None
+        self.blue_distance: float = None
         
         self.body_masks = []
         
@@ -151,45 +160,129 @@ class AsyncCam:
                 self.body_masks.append(Rect(mask["x"], mask["y"], mask["w"], mask["h"], mask["colour"]))
             elif mask["type"] == "sector":
                 self.body_masks.append(Sector(mask["center"], mask["radius"], mask["startAngle"], mask["endAngle"], mask["colour"]))
+    def draw_body_masks(self, frame, filled=True):
+        _fill = 1
+        if filled: _fill = -1
+        
+        for bmask in self.body_masks:
+            if type(bmask) == Circle:
+                cv2.circle(frame, bmask.center, bmask.radius, bmask.colour, _fill)
+            elif type(bmask) == Rect:
+                cv2.rectangle(frame, (bmask.x, bmask.y), (bmask.x + bmask.w, bmask.y + bmask.h), bmask.colour, _fill)
+            elif type(bmask) == Sector:
+                cv2.ellipse(frame, bmask.center, (bmask.radius, bmask.radius),
+                0, bmask.start_angle, bmask.end_angle, bmask.colour, _fill)
                 
-    def calculate_distance(self, radial_distance: float, a: float = 677.87957, b: float = 325.553) -> float:
+    def calculate_distance(self, radial_distance: float, a: float = 788225.001, b: float = 238685.681) -> float:
         return pow(a / (radial_distance - b), 2)
     
     def process(self, frame: cv2.typing.MatLike) -> cv2.typing.MatLike:
+        frame = cv2.circle(frame, [394, 418], 459, (0, 0, 0), 20)
+        self.draw_body_masks(frame, filled=False)
+        
         hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+        self.draw_body_masks(hsv, filled=True)
         
-        mask = cv2.inRange(hsv, self.ball.min, self.ball.max) 
-        # ~ mask = cv2.inRange(hsv, self.yellow.min, self.yellow.max)
-        # ~ mask = cv2.inRange(hsv, self.blue.min, self.blue.max)
+        def process_ball():
+            mask = cv2.inRange(hsv, self.ball.min, self.ball.max) 
+                
+            contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
             
-        contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            conglomerate = self.conglomerator.compute_maximal_conglomerate(contours, **self.conglomerate_settings["ball"])
+            if conglomerate is None:
+                self.angle = None
+                self.distance = None
+                return
+            
+            ellipse = cv2.fitEllipse(conglomerate)
+            center, size, angle = ellipse
+            dx, dy = center[0] - self.center[0], center[1] - self.center[1]
+            
+            true_angle = normalise(math.degrees(math.atan2(dy, dx)))
+            true_distance = self.calculate_distance(pow(dx, 2) + pow(dy, 2))
+            
+            if self.angle is None: self.angle = true_angle
+            self.angle = angle_lerp(self.angle, true_angle, t = 0.67)
+            if self.distance is None: self.distance = true_distance
+            self.distance = lerp(self.distance, true_distance, t = 0.67)
+            
+            if not self.debug: return
+            
+            cv2.drawContours(frame, contours, -1, (0, 220, 0), 1)
+            cv2.drawContours(frame, [conglomerate], 0, (255, 255, 255))
+            
+            pos = [int(center[0]), int(center[1])]
+            cv2.ellipse(frame, ellipse, (255, 255, 255), 1, cv2.LINE_AA)
+            cv2.drawMarker(frame, pos, (255, 255, 255))
+            cv2.line(frame, self.center, pos, (255, 255, 255), 3)
+            cv2.line(frame, self.center, pos, convert_hsv(self.ball.max, "bgr"), 2)
         
-        conglomerate = self.conglomerator.compute_maximal_conglomerate(contours, **self.conglomerate_settings["ball"])
-        if conglomerate is None: return frame
+        def process_goals():
+            yellow_mask = cv2.inRange(hsv, self.yellow.min, self.yellow.max) 
+            blue_mask = cv2.inRange(hsv, self.blue.min, self.blue.max) 
+                
+            # yellow mask
+            contours, _ = cv2.findContours(yellow_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            
+            conglomerate = self.conglomerator.compute_maximal_conglomerate(contours, **self.conglomerate_settings["yellow"])
+            if conglomerate is None:
+                self.yellow_angle = None
+                self.yellow_distance = None
+            else:
+            
+                M = cv2.moments(conglomerate)
+                centroid = [M['m10'] // M['m00'], M['m01'] // M['m00']]
+                
+                dx, dy = centroid[0] - self.center[0], centroid[1] - self.center[1]
+                true_angle = math.degrees(math.atan2(dy, dx))
+                true_distance = self.calculate_distance(pow(cv2.pointPolygonTest(conglomerate, self.center, True), 2))
+                
+                if self.yellow_angle is None: self.yellow_angle = true_angle
+                self.yellow_angle = angle_lerp(self.yellow_angle, true_angle, t = 0.67)
+                if self.yellow_distance is None: self.yellow_distance = true_distance
+                self.yellow_distance = lerp(self.yellow_distance, true_distance, t = 0.67)
+            
+                if self.debug:
+                    cv2.drawContours(frame, contours, -1, (0, 220, 0), 1)
+                    cv2.drawContours(frame, [conglomerate], 0, (255, 255, 255))
+                    
+                    centroid_int = [int(x) for x in centroid]
+                    cv2.drawMarker(frame, centroid_int, (255, 255, 255))
+                    cv2.line(frame, self.center, centroid_int, (255, 255, 255), 3)
+                    cv2.line(frame, self.center, centroid_int, convert_hsv(self.yellow.max, "bgr"), 2)
+            
+            # blue mask
+            contours, _ = cv2.findContours(blue_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            
+            conglomerate = self.conglomerator.compute_maximal_conglomerate(contours, **self.conglomerate_settings["blue"])
+            if conglomerate is None:
+                self.blue_angle = None
+                self.blue_distance = None
+                return
+            
+            M = cv2.moments(conglomerate)
+            centroid = [M['m10'] // M['m00'], M['m01'] // M['m00']]
+            
+            dx, dy = centroid[0] - self.center[0], centroid[1] - self.center[1]
+            true_angle = math.degrees(math.atan2(dy, dx))
+            true_distance = self.calculate_distance(pow(cv2.pointPolygonTest(conglomerate, self.center, True), 2))
+            
+            if self.blue_angle is None: self.blue_angle = true_angle
+            self.blue_angle = angle_lerp(self.blue_angle, true_angle, t = 0.67)
+            if self.blue_distance is None: self.blue_distance = true_distance
+            self.blue_distance = lerp(self.blue_distance, true_distance, t = 0.67)
+            
+            if self.debug:
+                cv2.drawContours(frame, contours, -1, (0, 220, 0), 1)
+                cv2.drawContours(frame, [conglomerate], 0, (255, 255, 255))
+                
+                centroid_int = [int(x) for x in centroid]
+                cv2.drawMarker(frame, centroid_int, (255, 255, 255))
+                cv2.line(frame, self.center, centroid_int, (255, 255, 255), 3)
+                cv2.line(frame, self.center, centroid_int, convert_hsv(self.blue.max, "bgr"), 2)
         
-        ellipse = cv2.fitEllipse(conglomerate)
-        center, size, angle = ellipse
-        dx, dy = center[0] - self.center[0], center[1] - self.center[1]
-        
-        self.true_angle = math.degrees(math.atan2(dy, dx))
-        self.true_distance = self.calculate_distance(math.sqrt(pow(dx, 2) + pow(dy, 2)) * 540 / self.size[1])
-        
-        if self.angle is None: self.angle = self.true_angle
-        self.angle = angle_lerp(self.angle, self.true_angle, t = 0.67)
-        if self.distance is None: self.distance = self.true_distance
-        self.distance = lerp(self.distance, self.true_distance, t = 0.67)
-        
-        # ~ print(f"{math.sqrt(pow(dx, 2) + pow(dy, 2)):.0f} {self.true_distance:.0f} {self.distance:.0f}")
-        
-        if not self.debug: return frame
-        
-        cv2.drawContours(frame, contours, -1, (0, 220, 0), 1)
-        cv2.drawContours(frame, [conglomerate], 0, (255, 255, 255))
-        
-        pos = [int(center[0]), int(center[1])]
-        cv2.ellipse(frame, ellipse, (255, 255, 255), 1, cv2.LINE_AA)
-        cv2.drawMarker(frame, pos, (255, 255, 255))
-        cv2.line(frame, self.center, pos, convert_hsv(self.ball.min, "bgr"), 5)
+        process_ball()
+        process_goals()
         
         return frame
     
@@ -197,7 +290,7 @@ class AsyncCam:
         self.current_frame = job.get_result()
         self.image_ready = True
     
-    async def main(self):
+    async def main(self, display=False):
         while True:
             try:
                 self.image_ready = False
@@ -212,16 +305,16 @@ class AsyncCam:
                 self.ticks += 1
                 self.elapsed += dt
                 
-                if not self.debug:
-                    yield self.current_frame
-                    continue
-                
                 if self.elapsed >= 1:
                     self.elapsed -= 1
                     self.fps = self.ticks
                     self.ticks = 0
                 
-                if self.ticks % 6 == 0:
+                if not display:
+                    yield self.current_frame
+                    continue
+                
+                if self.ticks % 6 == 1:
                     cv2.imshow("Camera", self.process(self.current_frame.copy()))
                     cv2.setWindowTitle("Camera", f"Camera FPS: {self.fps}")
                     cv2.waitKey(1)

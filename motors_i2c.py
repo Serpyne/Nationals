@@ -70,6 +70,10 @@ class Motor:
         speed = int(MAX_SPEED * speed)
         self.events.append(TimedEvent(speed, duration))
 
+    def set_immediately(self, speed: int):
+        data = struct.pack("<i", speed)
+        self.bus.write_i2c_block_data(self.i2c_address, 0x12, list(data))
+
     def set_speed(self, speed: int, force=True):
         """Set the speed of the motor, taking into account the direction (via sign)
         ; force[bool] bypasses motor timed events.
