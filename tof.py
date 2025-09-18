@@ -22,12 +22,14 @@ class TOF:
         
         sequence = data[0]
         self.true_distance = data[1] | (data[2] << 8) | (data[3] << 16) | (data[4] << 24)
-        return self.true_distance
+        self.true_distance *= 0.1 # Convert from mm to cm
+        
+        # ~ return self.true_distance
+        
         if self.distance == 0:
             self.distance = self.true_distance
         else:
             median = np.median(self.past_distances)
-            #print(median)
             if abs(self.true_distance - median) > reading_threshold:
                 return np.median(self.past_distances)
             self.distance += (self.true_distance - self.distance) * 0.2

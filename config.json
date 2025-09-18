@@ -90,56 +90,56 @@
     "colours": {
         "ball": [
             0,
-            244,
-            141,
-            2,
+            222,
+            144,
+            4,
             255,
             255
         ],
         "blue": [
-            101,
-            238,
-            104,
-            114,
+            109,
+            244,
+            117,
+            120,
             255,
-            172
+            161
         ],
         "yellow": [
-            47,
-            246,
-            60,
-            61,
+            20,
+            194,
+            83,
+            29,
             255,
-            92
+            154
         ]
     },
     "directionBias": 50000000,
     "id": "TS-chopped",
-    "maintainOrientationTurnSpeed": 0.021,
+    "maintainOrientationTurnSpeed": 0.03,
     "settings": {
         "ball": {
             "maximum_span": 49.8,
-            "minimum_conglomerate": 10,
-            "minimum_contour_size": 1
+            "minimum_conglomerate": 11,
+            "minimum_contour_size": 2
         },
         "blue": {
-            "maximum_span": 69.5,
+            "maximum_span": 145.4,
             "minimum_conglomerate": 10,
             "minimum_contour_size": 4
         },
         "yellow": {
-            "maximum_span": 66.8,
+            "maximum_span": 187.3,
             "minimum_conglomerate": 10,
-            "minimum_contour_size": 4
+            "minimum_contour_size": 6
         }
     },
     "speedBias": {
         "forwardDamping": 0.15,
         "sideDamping": 1.0
     },
-    "speedCenter": 0.85,
-    "speedDribble": 0.41,
-    "speedDrive": 0.67,
+    "speedCenter": 1.0,
+    "speedDribble": 0.7,
+    "speedDrive": 0.7,
     "speedMax": 0.8,
     "targetGoal": "yellow",
     "tofPositions": [

@@ -177,7 +177,7 @@ class AsyncCam:
         return pow(a / (radial_distance - b), 2)
     
     def process(self, frame: cv2.typing.MatLike) -> cv2.typing.MatLike:
-        frame = cv2.circle(frame, [394, 418], 459, (0, 0, 0), 20)
+        frame = cv2.circle(frame, [394, 418], 444, (0, 0, 0), 35)
         self.draw_body_masks(frame, filled=False)
         
         hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
@@ -196,7 +196,7 @@ class AsyncCam:
             
             ellipse = cv2.fitEllipse(conglomerate)
             center, size, angle = ellipse
-            dx, dy = center[0] - self.center[0], center[1] - self.center[1]
+            dx, dy = center[0] - self.center[0], center[1] - self.center[1] 
             
             true_angle = normalise(math.degrees(math.atan2(dy, dx)))
             true_distance = self.calculate_distance(pow(dx, 2) + pow(dy, 2))
@@ -234,7 +234,7 @@ class AsyncCam:
                 centroid = [M['m10'] // M['m00'], M['m01'] // M['m00']]
                 
                 dx, dy = centroid[0] - self.center[0], centroid[1] - self.center[1]
-                true_angle = math.degrees(math.atan2(dy, dx))
+                true_angle = normalise(math.degrees(math.atan2(dy, dx)))
                 true_distance = self.calculate_distance(pow(cv2.pointPolygonTest(conglomerate, self.center, True), 2))
                 
                 if self.yellow_angle is None: self.yellow_angle = true_angle
@@ -296,7 +296,7 @@ class AsyncCam:
                 self.image_ready = False
                 self.stream.capture_array(signal_function=self.on_capture_complete)
                 while not self.image_ready:
-                    await asyncio.sleep(0.001)
+                    await asyncio.sleep(0.0001)
                 
                 curr = now()
                 dt = curr - self.prev
@@ -314,7 +314,7 @@ class AsyncCam:
                     yield self.current_frame
                     continue
                 
-                if self.ticks % 6 == 1:
+                if self.ticks % 8 == 1:
                     cv2.imshow("Camera", self.process(self.current_frame.copy()))
                     cv2.setWindowTitle("Camera", f"Camera FPS: {self.fps}")
                     cv2.waitKey(1)
