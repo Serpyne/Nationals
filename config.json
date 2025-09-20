@@ -28,12 +28,13 @@
         "x4": 8.243e-06,
         "x5": -2.124e-08
     },
+    "backingDistance": 21.0,
     "blindnessTimer": 200,
     "cameraMasks": [
         {
             "center": [
-                400,
-                400
+                390,
+                410
             ],
             "colour": [
                 0,
@@ -47,46 +48,36 @@
         },
         {
             "center": [
-                400,
-                400
+                390,
+                410
             ],
             "colour": [
                 0,
                 255,
                 0
             ],
-            "radius": 160,
+            "radius": 175,
             "type": "circle"
         },
         {
             "center": [
-                250,
-                460
+                196,
+                338
             ],
             "colour": [
                 0,
                 255,
                 0
             ],
-            "endAngle": 240,
-            "radius": 100,
-            "startAngle": 75,
-            "type": "sector"
-        },
-        {
-            "colour": [
-                0,
-                255,
-                0
-            ],
-            "h": 32,
-            "type": "rect",
-            "w": 40,
-            "x": 300,
-            "y": 355
+            "radius": 12,
+            "type": "circle"
         }
     ],
     "cameraOrientation": 180,
+    "center": [
+        390,
+        410
+    ],
     "colours": {
         "ball": [
             0,
@@ -97,21 +88,83 @@
             255
         ],
         "blue": [
-            109,
-            244,
-            117,
-            120,
+            98,
+            237,
+            149,
+            108,
             255,
-            161
+            234
+        ],
+        "field": [
+            54,
+            239,
+            46,
+            62,
+            255,
+            130
+        ],
+        "lines": [
+            83,
+            109,
+            192,
+            92,
+            201,
+            255
         ],
         "yellow": [
-            20,
+            50,
             194,
-            83,
-            29,
+            81,
+            69,
             255,
-            154
+            186
         ]
+    },
+    "corners": {
+        "BottomLeft": {
+            "blue": [
+                107.06893500840596,
+                41.823322980798494
+            ],
+            "front": "yellow",
+            "yellow": [
+                5.741113261689094,
+                132.04705302740348
+            ]
+        },
+        "BottomRight": {
+            "blue": [
+                -106.6844971486926,
+                53.57284671736947
+            ],
+            "front": "yellow",
+            "yellow": [
+                -11.41311932022677,
+                116.65686762949446
+            ]
+        },
+        "TopLeft": {
+            "blue": [
+                165.6603008824889,
+                104.22709196821631
+            ],
+            "front": "yellow",
+            "yellow": [
+                62.277358046695085,
+                46.581088169989684
+            ]
+        },
+        "TopRight": {
+            "blue": [
+                199.7172236477839,
+                95.49858667724654
+            ],
+            "front": "yellow",
+            "yellow": [
+                -59.22811334554625,
+                33.02360822791141
+            ]
+        }
     },
     "directionBias": 50000000,
     "id": "TS-chopped",
@@ -127,20 +180,30 @@
             "minimum_conglomerate": 10,
             "minimum_contour_size": 4
         },
+        "field": {
+            "maximum_span": 11.9,
+            "minimum_conglomerate": 44,
+            "minimum_contour_size": 30
+        },
+        "lines": {
+            "maximum_span": 199.0,
+            "minimum_conglomerate": 10,
+            "minimum_contour_size": 23
+        },
         "yellow": {
-            "maximum_span": 187.3,
+            "maximum_span": 131.0,
             "minimum_conglomerate": 10,
             "minimum_contour_size": 6
         }
     },
     "speedBias": {
-        "forwardDamping": 0.15,
-        "sideDamping": 1.0
+        "forwardDamping": -0.41,
+        "sideDamping": 0.30
     },
     "speedCenter": 1.0,
     "speedDribble": 0.7,
-    "speedDrive": 0.7,
-    "speedMax": 0.8,
+    "speedDrive": 0.9,
+    "speedMax": 0.9,
     "targetGoal": "yellow",
     "tofPositions": [
         36,

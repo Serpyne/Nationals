@@ -13,7 +13,9 @@ from colorsys import hsv_to_rgb
 from masks import *
 
 
-
+def calculate_distance(radial_distance: float, a: float = 788225.001, b: float = 238685.681) -> float:
+    return pow(a / (radial_distance - b), 2)
+    
 def normalise(angle_degrees: float) -> float:
     return (angle_degrees + 180) % 360 - 180
 def angle_lerp(alpha: float, beta: float, t: float) -> float:
@@ -118,7 +120,6 @@ class AsyncCam:
         ))
         self.stream.controls.ExposureTime = self.controls["ExposureTime"]
         self.stream.controls.Saturation = self.controls["Saturation"]
-        self.stream.start()
         # ~ print(self.stream.camera_properties)
         print(f"Initialised camera with resolution {size[0]}x{size[1]}, exposure time of {self.controls['ExposureTime'] * 0.001} ms, saturation of {self.controls['Saturation']}")
     
@@ -172,16 +173,18 @@ class AsyncCam:
             elif type(bmask) == Sector:
                 cv2.ellipse(frame, bmask.center, (bmask.radius, bmask.radius),
                 0, bmask.start_angle, bmask.end_angle, bmask.colour, _fill)
-                
-    def calculate_distance(self, radial_distance: float, a: float = 788225.001, b: float = 238685.681) -> float:
-        return pow(a / (radial_distance - b), 2)
-    
-    def process(self, frame: cv2.typing.MatLike) -> cv2.typing.MatLike:
+            
+    def process(self, frame: cv2.typing.MatLike | None, return_image: bool = True) -> cv2.typing.MatLike:
+        if frame is None:
+            frame = self.current_frame
+            
         frame = cv2.circle(frame, [394, 418], 444, (0, 0, 0), 35)
-        self.draw_body_masks(frame, filled=False)
         
         hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
         self.draw_body_masks(hsv, filled=True)
+        
+        self.draw_body_masks(frame, filled=False)
+        
         
         def process_ball():
             mask = cv2.inRange(hsv, self.ball.min, self.ball.max) 
@@ -199,7 +202,7 @@ class AsyncCam:
             dx, dy = center[0] - self.center[0], center[1] - self.center[1] 
             
             true_angle = normalise(math.degrees(math.atan2(dy, dx)))
-            true_distance = self.calculate_distance(pow(dx, 2) + pow(dy, 2))
+            true_distance = calculate_distance(pow(dx, 2) + pow(dy, 2))
             
             if self.angle is None: self.angle = true_angle
             self.angle = angle_lerp(self.angle, true_angle, t = 0.67)
@@ -235,7 +238,7 @@ class AsyncCam:
                 
                 dx, dy = centroid[0] - self.center[0], centroid[1] - self.center[1]
                 true_angle = normalise(math.degrees(math.atan2(dy, dx)))
-                true_distance = self.calculate_distance(pow(cv2.pointPolygonTest(conglomerate, self.center, True), 2))
+                true_distance = calculate_distance(pow(cv2.pointPolygonTest(conglomerate, self.center, True), 2))
                 
                 if self.yellow_angle is None: self.yellow_angle = true_angle
                 self.yellow_angle = angle_lerp(self.yellow_angle, true_angle, t = 0.67)
@@ -265,7 +268,7 @@ class AsyncCam:
             
             dx, dy = centroid[0] - self.center[0], centroid[1] - self.center[1]
             true_angle = math.degrees(math.atan2(dy, dx))
-            true_distance = self.calculate_distance(pow(cv2.pointPolygonTest(conglomerate, self.center, True), 2))
+            true_distance = calculate_distance(pow(cv2.pointPolygonTest(conglomerate, self.center, True), 2))
             
             if self.blue_angle is None: self.blue_angle = true_angle
             self.blue_angle = angle_lerp(self.blue_angle, true_angle, t = 0.67)
@@ -284,13 +287,15 @@ class AsyncCam:
         process_ball()
         process_goals()
         
-        return frame
+        if return_image: return frame
     
     def on_capture_complete(self, job):
         self.current_frame = job.get_result()
         self.image_ready = True
     
     async def main(self, display=False):
+        self.stream.start()
+        print(f"Camera stream started.")
         while True:
             try:
                 self.image_ready = False

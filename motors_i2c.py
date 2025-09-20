@@ -7,19 +7,10 @@ import time
 import struct
 import asyncio
 
-MAX_SPEED = 95_000_000
-TICK_DURATION = 0.1
+MAX_SPEED = 100_000_000
 
 def clamp(value, a, b):
     return max(a, min(value, b))
-
-class TimedEvent:
-    def __init__(self, speed_value: int, duration: float = -1):
-        self.speed = speed_value
-        self.duration = duration
-    @property
-    def indefinite(self):
-        return bool(self.duration < 0)
 
 class Motor:
     def __init__(self, address, bus_number: int = 1,
@@ -30,7 +21,8 @@ class Motor:
                  elec_angle_offset: int = 1510395136,
                  sin_cos_centre: int = 1251,
                  operating_mode_and_sensor: tuple[int] = (3, 1),
-                 command_mode: int = 12):
+                 command_mode: int = 12,
+                 max_speed: int = None):
         self.i2c_address = address
         self.bus = smbus2.SMBus(bus_number)
         self.QDRformat = 0
@@ -44,47 +36,14 @@ class Motor:
         self.set_sin_cos_centre(sin_cos_centre)
         self.configure_operating_mode_and_sensor(*operating_mode_and_sensor)
         self.configure_command_mode(command_mode)
+        
+        self.max_speed = max_speed if max_speed is not None else MAX_SPEED
 
-        self.state = TimedEvent(0)
-        self.events = []
-
-    async def event_loop(self):
-        while True:
-            if len(self.events) > 0:
-                event = self.events.pop(0)
-                #print(f"Setting {self.i2c_address} to {event.speed}.")
-                # WRITE DATA AND THEN SET CURRENT STATE TO SPEED
-                if self.state != event:
-                    data = struct.pack("<i", event.speed)
-                    self.bus.write_i2c_block_data(self.i2c_address, 0x12, list(data))
-                    self.state = event
-                await asyncio.sleep(event.duration)
-            else:
-                if not self.state.indefinite:
-                    if self.state.speed != 0: self.set_speed(0)
-                    self.state = TimedEvent(0)
-            await asyncio.sleep(TICK_DURATION)
-
-    def set_speed_for(self, speed: int, duration: float):
-        speed = clamp(speed, -1, 1)
-        speed = int(MAX_SPEED * speed)
-        self.events.append(TimedEvent(speed, duration))
-
-    def set_immediately(self, speed: int):
-        data = struct.pack("<i", speed)
-        self.bus.write_i2c_block_data(self.i2c_address, 0x12, list(data))
-
-    def set_speed(self, speed: int, force=True):
-        """Set the speed of the motor, taking into account the direction (via sign)
-        ; force[bool] bypasses motor timed events.
-        """
+    def set_speed(self, speed: int):
         try:
-            speed = clamp(speed, -1.0, 1.0)
-            speed = int(MAX_SPEED * speed)
+            speed = int(self.max_speed * clamp(speed, -1.0, 1.0))
             data = struct.pack("<i", speed)
-            if self.state.speed == speed: return
-            if force: self.events = [TimedEvent(speed)]
-            #self.bus.write_i2c_block_data(self.i2c_address, 0x12, list(data))
+            self.bus.write_i2c_block_data(self.i2c_address, 0x12, list(data))
         except Exception as e:
             print(f"Error setting Speed: {e}")
 
