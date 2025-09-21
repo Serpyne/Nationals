@@ -33,19 +33,43 @@ def smooth_linear(x: float, a = 674.1) -> float:
     return pow(x, 3) / (a + pow(x, 2))
     
 def in_range(x, x_range) -> bool:
-    return x_range[0] < x and x < x_range[1]
+    if x_range[0] > x_range[1]:
+        x_range = (x_range[1], x_range[0])
+    return x_range[0] <= x and x <= x_range[1]
 
-def get_goal_vectors(top: list, bottom: list) -> list[float, float]:
-    # ~ print(top, bottom)
-    ta, td = math.radians(top[0]), top[1]
-    ba, bd = math.radians(bottom[0]), bottom[1]
+# ~ def get_goal_vectors(top: list, bottom: list) -> list[float, float]:
+    # ~ if type(top) == dict: top = [top["angle"], top["dist"]]
+    # ~ if type(bottom) == dict: bottom = [bottom["angle"], bottom["dist"]]
+    # ~ ta, td = math.radians(top[0]), top[0]
+    # ~ ba, bd = math.radians(bottom[0]), bottom[0]
     
-    x_top = td * math.sin(ta)
-    x_bottom = bd * math.sin(ba)
-    y_top = td * math.cos(ta)
-    y_bottom = bd * math.cos(ba)
+    # ~ x_top = td * math.sin(ta)
+    # ~ x_bottom = bd * math.sin(ba)
+    # ~ y_top = td * math.cos(ta)
+    # ~ y_bottom = bd * math.cos(ba)
     
-    return (x_top, x_bottom, y_top, y_bottom)
+    # ~ return (x_top, x_bottom, y_top, y_bottom)
+    
+# ~ def in_cassini_oval(d1: float, d2: float, half_width: float = 90.5):
+    # ~ return d1 * d2 < 2 * pow(half_width, 2)
+
+def calculate_x(y_hit: float, a1: float, a2: float):
+    x_hits = [0, 0]
+    a1 -= 90
+    a2 -= 90
+    if a1 % 180 != 0:
+        "y = tan(a1)x - 243/2"
+        x_hits[0] = ( y_hit + 243 / 2 ) / math.tan(math.radians(a1))
+    else:
+        x_hits[0] = 0
+    if a2 % 180 != 0:
+        "y = tan(a2)x + 243/2"
+        x_hits[1] = ( y_hit - 243 / 2 ) / math.tan(math.radians(a2))
+    else:
+        x_hits[1] = 0
+    return -np.mean(x_hits)
+def y_from_distances(d1, d2, half_h = 243 / 2) -> float:
+    return half_h * (d1 - d2) / (d1 + d2)
 
 class Goal:
     Yellow = "Yellow"
@@ -105,6 +129,7 @@ class Blackboard:
     atAttackingGoalTicks: int = 0
     goalTicks: int = 0
     xPosition: float = None
+    approxXPosition: float = None
     yPosition: float = None
     kickoffDuration: float = 2000
     kickoffTimer: float = 0
@@ -181,68 +206,69 @@ class Robot:
         self.speedBias = self.config["speedBias"]
         self.angleCoeff = self.config["anglePolyCoefficients"]
         
-        corners = self.config["corners"]
-        front = corners["TopLeft"]["front"]
+        self.corners = self.config["corners"]
+        front = self.corners["TopLeft"]["front"]
+        back = "blue" if front == "yellow" else "yellow"
         self.cornerFrontDirection = Goal.Yellow if front == "yellow" else Goal.Blue
         
-        lengths = []
-        x_top, x_bottom, y_top, y_bottom = get_goal_vectors(top=corners["TopLeft"]["yellow"], bottom=corners["TopLeft"]["blue"])
-        self.left = -0.5 * (x_top + x_bottom)
-        lengths.append(y_top - y_bottom)
-        x_top, x_bottom, y_top, y_bottom = get_goal_vectors(top=corners["TopRight"]["yellow"], bottom=corners["TopRight"]["blue"])
-        self.right = -0.5 * (x_top + x_bottom)
-        lengths.append(y_top - y_bottom)
-        x_top, x_bottom, y_top, y_bottom = get_goal_vectors(top=corners["BottomLeft"]["yellow"], bottom=corners["BottomLeft"]["blue"])
-        self.left = 0.5 * self.left - 0.25 * (x_top + x_bottom)
-        lengths.append(y_top - y_bottom)
-        x_top, x_bottom, y_top, y_bottom = get_goal_vectors(top=corners["BottomRight"]["yellow"], bottom=corners["BottomRight"]["blue"])
-        self.right = 0.5 * self.right - 0.25 * (x_top + x_bottom)
-        lengths.append(y_top - y_bottom)
+        # ~ lengths = []
+        # ~ x_top, x_bottom, y_top, y_bottom = get_goal_vectors(top=self.corners["TopLeft"]["yellow"], bottom=self.corners["TopLeft"]["blue"])
+        # ~ self.left = -0.5 * abs(x_top + x_bottom)
+        # ~ print(x_top, x_bottom, y_top, y_bottom)
+        # ~ lengths.append(abs(y_top - y_bottom))
+        # ~ x_top, x_bottom, y_top, y_bottom = get_goal_vectors(top=self.corners["TopRight"]["yellow"], bottom=self.corners["TopRight"]["blue"])
+        # ~ self.right = 0.5 * abs(x_top + x_bottom)
+        # ~ print(x_top, x_bottom, y_top, y_bottom)
+        # ~ lengths.append(abs(y_top - y_bottom))
+        # ~ x_top, x_bottom, y_top, y_bottom = get_goal_vectors(top=self.corners["BottomLeft"]["yellow"], bottom=self.corners["BottomLeft"]["blue"])
+        # ~ self.left = max(self.left, -0.5 * abs(x_top + x_bottom))
+        # ~ print(x_top, x_bottom, y_top, y_bottom)
+        # ~ lengths.append(abs(y_top - y_bottom))
+        # ~ x_top, x_bottom, y_top, y_bottom = get_goal_vectors(top=self.corners["BottomRight"]["yellow"], bottom=self.corners["BottomRight"]["blue"])
+        # ~ self.right = min(self.right, 0.5 * abs(x_top + x_bottom))
+        # ~ print(x_top, x_bottom, y_top, y_bottom)
+        # ~ lengths.append(abs(y_top - y_bottom))
         
-        self.width = self.right - self.left
-        self.length = np.mean(lengths)
+        # ~ self.width = self.right - self.left
+        # ~ self.length = np.mean(lengths)
+        # ~ print(self.left, self.right, self.width, self.length)
         
-        # ~ self.TL = determine_pos_from_goals(top=corners["TopLeft"]["yellow"], bottom=corners["TopLeft"]["blue"])
-        # ~ self.TR = determine_pos_from_goals(top=corners["TopRight"]["yellow"], bottom=corners["TopRight"]["blue"])
-        # ~ self.BL = determine_pos_from_goals(top=corners["BottomLeft"]["yellow"], bottom=corners["BottomLeft"]["blue"])
-        # ~ self.BR = determine_pos_from_goals(top=corners["BottomRight"]["yellow"], bottom=corners["BottomRight"]["blue"])
-        
-        # ~ co = ["TopLeft", "TopRight", "BottomLeft", "BottomRight"]
-        # ~ print("a_1=", [corners[c]["yellow"][0] for i, c in enumerate(co)])
-        # ~ print("d_1=", [corners[c]["yellow"][1] for i, c in enumerate(co)])
-        # ~ print("a_2=", [corners[c]["blue"][0] for i, c in enumerate(co)])
-        # ~ print("d_2=", [corners[c]["blue"][1] for i, c in enumerate(co)])
+        tl = self.corners["TopLeft"]
+        y_hit = y_from_distances(tl[back]["dist"], tl[front]["dist"])
+        x_hit = calculate_x(y_hit, tl[back]["angle"], tl[front]["angle"])
+        print(x_hit, y_hit)
         
         self.utils.camera.set_masks(self.config["cameraMasks"])
         self.prev: float = now()
         self.dt: float = 1/60
         self.update_interval: float = 0.00001
         
-    def determine_position(self, overcompensation_factor = 1.1) -> tuple:
-        if None in [self.vars.lastGlobalYellowAngle, self.vars.lastGlobalBlueAngle]: return None
-        ta = self.vars.lastGlobalYellowAngle + self.vars.heading
-        td = self.vars.lastGlobalYellowDistance
-        ba = self.vars.lastGlobalBlueAngle + self.vars.heading
-        bd = self.vars.lastGlobalBlueDistance
-        if ta is None and ba is None: return None
-        if ta is None:
-            a = math.radians(ba)
-            x = -bd * math.sin(a)
-            y = 0.5 * self.length - bd * math.cos(a)
-            if x < 0: rx = x / (-self.left)
-            else: rx = x / self.right
-            return (overcompensation_factor * rx, overcompensation_factor * 2 * y / self.length)
-        if ba is None:
-            a = math.radians(ta)
-            x = -td * math.sin(a)
-            y =  0.5 * self.length - td * math.cos(a)
-            if x < 0: rx = x / (-self.left)
-            else: rx = x / self.right
-            return (overcompensation_factor * rx, overcompensation_factor * 2 * y / self.length)
-        x_top, x_bottom, y_top, y_bottom = get_goal_vectors((ta - self.vars.heading, td), (ba - self.vars.heading, bd))
-        x = -(x_top + x_bottom)
-        y = -(y_top + y_bottom)
-        return (x / self.width, y / self.length)
+    # ~ def determine_position(self, overcompensation_factor = 1.1) -> tuple:
+        # ~ if None in [self.vars.lastGlobalYellowAngle, self.vars.lastGlobalBlueAngle]: return None
+        # ~ ta = self.vars.lastGlobalYellowAngle + self.vars.heading
+        # ~ td = self.vars.lastGlobalYellowDistance
+        # ~ ba = self.vars.lastGlobalBlueAngle + self.vars.heading
+        # ~ bd = self.vars.lastGlobalBlueDistance
+        # ~ if ta is None and ba is None: return None
+        # ~ if ta is None:
+            # ~ a = math.radians(ba)
+            # ~ x = bd * math.sin(a)
+            # ~ y = 0.5 * self.length - bd * math.cos(a)
+            # ~ if x < 0: rx = x / (-self.left)
+            # ~ else: rx = x / self.right
+            # ~ return (overcompensation_factor * rx, overcompensation_factor * 2 * y / self.length)
+        # ~ if ba is None:
+            # ~ a = math.radians(ta)
+            # ~ x = td * math.sin(a)
+            # ~ y =  0.5 * self.length - td * math.cos(a)
+            # ~ if x < 0: rx = x / (-self.left)
+            # ~ else: rx = x / self.right
+            # ~ return (overcompensation_factor * rx, overcompensation_factor * 2 * y / self.length)
+        # ~ x_top, x_bottom, y_top, y_bottom = get_goal_vectors(top=(ta - self.vars.heading, td), bottom=(ba - self.vars.heading, bd))
+        # ~ x = (x_top + x_bottom)
+        # ~ y = -(y_top + y_bottom)
+        # ~ print((ta - self.vars.heading, td), (ba - self.vars.heading, bd), *[int(x) for x in (x_top, x_bottom, y_top, y_bottom)])
+        # ~ return (x / self.width, y / self.length)
         
     def calculate_final_direction(self, angle: float, distance: float) -> float:
         def angle_poly(x: float) -> float:
@@ -271,12 +297,12 @@ class Robot:
         elif self.vars.position[0] >= 1.0:
             normal_direction = -90
             normal_magnitude = self.vars.position[0] - 1.0
-        if self.vars.position[1] >= 1.0:
-            normal_direction = 180
-            normal_magnitude = self.vars.position[1] - 1.0
-        elif self.vars.position[1] <= -1.0:
-            normal_direction = 180
-            normal_magnitude = -self.vars.position[1] - 1.0
+        # ~ if self.vars.position[1] >= 1.0:
+            # ~ normal_direction = 180
+            # ~ normal_magnitude = self.vars.position[1] - 1.0
+        # ~ elif self.vars.position[1] <= -1.0:
+            # ~ normal_direction = 180
+            # ~ normal_magnitude = -self.vars.position[1] - 1.0
             
         if normal_direction == 0: return
         
@@ -286,19 +312,56 @@ class Robot:
         diffAngle = abs(deltaAngle)
         
         # If they're pointing in the same direction
-        if diffAngle <= 90: return
+        if diffAngle <= 90 and abs(normal_magnitude) < 0.25: return
         
         # Perpendicular = 1 * original speed, Antiparallel = 0
-        new_speed = (0.2 + 0.8 * math.sin(math.radians(diffAngle))) * speed
-        da = lerp(0, 20, clamp(normal_magnitude - 0.5, 0, 1))
+        new_speed = (0.15 + 0.85 * math.sin(math.radians(diffAngle))) * speed
+        da = lerp(0, 85, clamp(normal_magnitude, 0, 1))
         if normalise(deltaAngle + self.vars.heading) > 0:
-            new_direction = normal_direction + (90 + da) + self.vars.heading
+            new_direction = normal_direction + (90 - da) + self.vars.heading
         else:
-            new_direction = normal_direction - (90 + da) + self.vars.heading
+            new_direction = normal_direction - (90 - da) + self.vars.heading
         
         return (new_direction, new_speed)
         
-    async def drive_in_direction(self, angle: float, speed: float, contribution: float = 1.0):
+    async def drive_in_direction(self, angle: float, speed: float, contribution: float = 1.0, oob_angle: float = 15.0):
+        # First pass for out of bounds with angle checking.
+        if self.utils.camera.blue_angle is not None:
+            ba = self.utils.camera.blue_angle - self.vars.heading
+            bd = self.utils.camera.blue_distance
+            if self.vars.target_goal == Goal.Yellow:
+                angle_range = (self.corners["BottomLeft"]["blue"]["angle"], self.corners["BottomRight"]["blue"]["angle"])
+                if in_range(ba, (0, angle_range[0])) or in_range(ba, (angle_range[1], 0)):
+                    if ba < 0:
+                        angle = clamp(self.utils.camera.blue_angle + 90, -90, -oob_angle)
+                    else:
+                        angle = clamp(self.utils.camera.blue_angle - 90, oob_angle, 90)
+            else:
+                angle_range = (normalise(self.corners["BottomLeft"]["blue"]["angle"] + 180), normalise(self.corners["BottomRight"]["blue"]["angle"] + 180))
+                if not (in_range(ba, angle_range)):
+                    if ba < 0:
+                        angle = clamp(self.utils.camera.blue_angle - 90, -180 + oob_angle, -90)
+                    else:
+                        angle = clamp(self.utils.camera.blue_angle + 90, 90, 180 - oob_angle)
+        elif self.utils.camera.yellow_angle is not None: # and self.utils.camera.blue_angle is None:
+            ta = self.utils.camera.yellow_angle - self.vars.heading
+            td = self.utils.camera.yellow_distance
+            if self.vars.target_goal == Goal.Yellow:
+                angle_range = (self.corners["TopRight"]["yellow"]["angle"], self.corners["TopLeft"]["yellow"]["angle"])
+                if not in_range(ta, angle_range):
+                    if ta < 0:
+                        angle = clamp(self.utils.camera.yellow_angle - 90, -180 + oob_angle, -90)
+                    else:
+                        angle = clamp(self.utils.camera.yellow_angle + 90, 90, 180 - oob_angle)
+            else:
+                angle_range = (normalise(self.corners["TopRight"]["yellow"]["angle"] + 180), normalise(self.corners["TopLeft"]["yellow"]["angle"] + 180))
+                if in_range(ta, (0, angle_range[0])) or in_range(ta, (angle_range[1], 0)):
+                    if ta < 0:
+                        angle = clamp(self.utils.camera.yellow_angle + 90, -90, -oob_angle)
+                    else:
+                        angle = clamp(self.utils.camera.yellow_angle - 90, oob_angle, 90)
+        
+        # Second pass for position checking
         new_angle_speed_pair = self.compute_new_direction_vector(angle, speed)
         self.vars.outOfBounds = False
         self.vars.outOfBoundsTicks -= 1
@@ -306,7 +369,7 @@ class Robot:
             self.vars.outOfBounds = True
             self.vars.outOfBoundsTicks = 30
             angle, speed = new_angle_speed_pair
-        # ~ print(new_angle_speed_pair is not None, round(angle))
+        # ~ print(new_angle_speed_pair is not None, round(angle), round(speed, 2))
         
         FL = math.sin(math.radians(35 - angle))
         FR = math.sin(math.radians(35 + angle))
@@ -318,12 +381,13 @@ class Robot:
             FL = (speed / abs(FR)) * FL
             FR = (speed / FR) * abs(FR)
             
-        self.future_motor_speeds[0] += FL * contribution
-        self.future_motor_speeds[1] += FR * contribution
-        self.future_motor_speeds[2] += -FL * contribution
-        self.future_motor_speeds[3] += -FR * contribution
+        # ~ self.future_motor_speeds[0] += FL * contribution
+        # ~ self.future_motor_speeds[1] += FR * contribution
+        # ~ self.future_motor_speeds[2] += -FL * contribution
+        # ~ self.future_motor_speeds[3] += -FR * contribution
         
         self.vars.lastSpeed = speed
+        
     async def turn(self, speed: float, contribution: float = 1.0):
         for i in range(4):
             self.future_motor_speeds[i] += clamp(speed * contribution, -1, 1)
@@ -502,15 +566,15 @@ class Robot:
             # ~ return
             
             if self.bb.capturedSpeed is not None:
-                self.bb.capturedSpeed *= .960
+                self.bb.capturedSpeed *= .950
                 
             # If the robot is facing forward
             if abs(self.vars.heading) <= 90:
                 if self.bb.targetDirection is None:
                     if self.bb.xPosition < 0: # left side of field
-                        self.bb.targetDirection = 85
+                        self.bb.targetDirection = 90
                     else: # right side of field
-                        self.bb.targetDirection = -85
+                        self.bb.targetDirection = -90
                     self.bb.previousTargetDirection = self.bb.targetDirection
                     self.bb.capturedSpeed = self.vars.lastSpeed
                     self.bb.atAttackingGoalTicks = 0
@@ -529,8 +593,8 @@ class Robot:
             newAngle = angle_lerp(newAngle, 0, clamp_lerp(attackingDistance, 100, 67))
             deltaAngle = normalise(self.vars.heading - newAngle)
             
-            TF = 0.004
-            LF = 0.25
+            TF = 0.005
+            LF = 0.3
             
             # Drives and lerps the speed down so that the ball can be captured
             if abs(deltaAngle) >= 30 and self.bb.atAttackingGoalTicks <= 0 and self.bb.capturedSpeed >= 0.10:
@@ -732,8 +796,8 @@ class Robot:
                     # ~ "atAttackingGoal": self.bb.atAttackingGoal,
                     "atAttackingGoalTicks": self.bb.atAttackingGoalTicks,
                     # ~ "goalTicks": self.bb.goalTicks,
-                    # ~ "xPosition": self.bb.xPosition,
-                    # ~ "yPosition": self.bb.yPosition,
+                    "xPosition": self.bb.approxXPosition,
+                    "yPosition": self.bb.yPosition,
                     # ~ "captureTof": self.vars.frontTofDistance,
                     # ~ "has_ball": self.vars.has_ball,
                     # ~ "kickoffTimer": self.bb.kickoffTimer,
@@ -749,6 +813,7 @@ class Robot:
                     # ~ "capturedSpeed": self.bb.capturedSpeed
                     # ~ "cornerFrontDirection": self.cornerFrontDirection,
                     "position": self.vars.position,
+                    "lastSpeed": self.vars.lastSpeed,
                     "OOB": self.vars.outOfBounds
                 }
                 for key, val in v.items():
@@ -811,7 +876,9 @@ class Robot:
             # Camera localisation
             d1, d2 = self.bb.defendingDistance, self.bb.attackingDistance
             if None not in [d1, d2]:
-                self.bb.yPosition = (243 / 2) * (d1 - d2) / (d1 + d2)
+                self.bb.yPosition = y_from_distances(d1, d2)
+                a1, a2 = self.bb.defendingAngle - self.vars.heading, self.bb.attackingAngle - self.vars.heading
+                self.bb.approxXPosition = calculate_x(self.bb.yPosition, a1, a2)
             else:
                 if d1 is None and d2 is None:
                     ...
@@ -819,7 +886,7 @@ class Robot:
                     self.bb.yPosition = 67 - d2 * math.cos(math.radians(self.bb.attackingAngle))
                 else:
                     self.bb.yPosition = -94 - d1 * math.cos(math.radians(self.bb.defendingAngle))
-            self.vars.position = self.determine_position()
+            # ~ self.vars.position = self.determine_position()
             
                 
             # I do this so that when it starts up it doesnt just sprint away

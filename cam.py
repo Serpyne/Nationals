@@ -178,7 +178,7 @@ class AsyncCam:
         if frame is None:
             frame = self.current_frame
             
-        frame = cv2.circle(frame, [394, 418], 444, (0, 0, 0), 35)
+        frame = cv2.circle(frame, [394, 418], 444, (0, 0, 0), 30)
         
         hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
         self.draw_body_masks(hsv, filled=True)

@@ -210,6 +210,7 @@ class AsyncCam:
     
     def process(self, frame: cv2.typing.MatLike, mask_index = None) -> cv2.typing.MatLike:
         hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+        frame = cv2.circle(frame, [394, 418], 444, (0, 0, 0), 30)
         self.draw_body_masks(frame, filled=False)
         self.draw_body_masks(hsv, filled=True)
         
@@ -401,10 +402,7 @@ class ColorUI:
         self.notebook.add(self.field_tab, text="Field")
         
         self.corners_tab = ttk.Frame()
-        def reset_heading():
-            self.root.initial_headings = [compass.read() for compass in self.root.compasses]
-            print("Reset heading.")
-        tk.Button(self.corners_tab, text="Reset Heading", command=reset_heading).pack()
+        tk.Button(self.corners_tab, text="Reset Heading", command=self.root.reset_heading).pack()
         
         corners = ["TopLeft", "TopRight", "BottomLeft", "BottomRight"]
         def save_corner(corner_name, filename = "config.json"):
@@ -443,7 +441,7 @@ class ColorUI:
                 print("Goals need to be front and back.")
                 return
         
-            data = {"yellow": [gya, self.distance["yellow"]], "blue": [gba, self.distance["blue"]], "front": ["yellow", "blue"][int(blueFront)]}
+            data = {"yellow": {"angle": gya, "dist": self.distance["yellow"]}, "blue": {"angle": gba, "dist": self.distance["blue"]}, "front": ["yellow", "blue"][int(blueFront)]}
         
             config["corners"][corner_name] = data
             with open(Path(__file__).parent / filename, "w") as f:
@@ -507,7 +505,12 @@ class Application(tk.Tk):
         ]
         self.compasses = [Compass(0x4a), Compass(0x4b)]
         sleep(0.5)
-        self.initial_headings = [compass.read() for compass in self.compasses]
+        self.initial_headings = [0 for compass in self.compasses]
+        self.reset_heading()
+    def reset_heading(self):
+        for i, compass in enumerate(self.compasses):
+            if not compass.enabled: continue
+            self.initial_headings[i] = compass.read()
     
     def get_orientation(self) -> float:
         angles = [normalise(compass.read() - self.initial_headings[i]) for i, compass in enumerate(self.compasses) if compass.enabled]
