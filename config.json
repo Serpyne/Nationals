@@ -33,50 +33,64 @@
     "cameraMasks": [
         {
             "center": [
-                390,
-                410
+                397,
+                407
             ],
             "colour": [
-                0,
-                255,
-                0
+                50,
+                50,
+                255
             ],
-            "endAngle": 310,
-            "radius": 200,
-            "startAngle": 50,
+            "endAngle": 309,
+            "radius": 199,
+            "startAngle": 52,
             "type": "sector"
         },
         {
             "center": [
-                390,
-                410
+                397,
+                407
             ],
             "colour": [
-                0,
                 255,
-                0
+                100,
+                50
             ],
-            "radius": 175,
-            "type": "circle"
+            "endAngle": 334,
+            "radius": 177,
+            "startAngle": 27,
+            "type": "sector"
         },
         {
             "center": [
-                196,
-                338
+                197,
+                363
             ],
             "colour": [
-                0,
-                255,
-                0
+                50,
+                120,
+                220
             ],
-            "radius": 12,
+            "radius": 10,
             "type": "circle"
+        },
+        {
+            "x": 397,
+            "y": 327,
+            "w": 160,
+            "h": 160,
+            "colour": [
+                50,
+                120,
+                220
+            ],
+            "type": "rect"
         }
     ],
     "cameraOrientation": 180,
     "center": [
-        390,
-        410
+        397,
+        407
     ],
     "colours": {
         "ball": [

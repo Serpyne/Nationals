@@ -9,6 +9,7 @@ from time import perf_counter as now
 import sys
 import math
 from colorsys import hsv_to_rgb
+from screeninfo import get_monitors
 
 from masks import *
 
@@ -156,13 +157,14 @@ class AsyncCam:
         self.body_masks.clear()
         for mask in masks:
             if mask["type"] == "circle":
+                print(mask["center"])
                 self.body_masks.append(Circle(mask["center"], mask["radius"], mask["colour"]))
             elif mask["type"] == "rect":
                 self.body_masks.append(Rect(mask["x"], mask["y"], mask["w"], mask["h"], mask["colour"]))
             elif mask["type"] == "sector":
                 self.body_masks.append(Sector(mask["center"], mask["radius"], mask["startAngle"], mask["endAngle"], mask["colour"]))
-    def draw_body_masks(self, frame, filled=True):
-        _fill = 1
+    def draw_body_masks(self, frame, filled=True, width = 3):
+        _fill = width
         if filled: _fill = -1
         
         for bmask in self.body_masks:
@@ -296,6 +298,10 @@ class AsyncCam:
     async def main(self, display=False):
         self.stream.start()
         print(f"Camera stream started.")
+        monitor = None; wx = wy = 0
+        if display:
+            monitor = get_monitors()[0]
+            wx, wy = monitor.width - self.size[0] - 5, (monitor.height - self.size[1]) // 2
         while True:
             try:
                 self.image_ready = False
@@ -322,6 +328,7 @@ class AsyncCam:
                 if self.ticks % 8 == 1:
                     cv2.imshow("Camera", self.process(self.current_frame.copy()))
                     cv2.setWindowTitle("Camera", f"Camera FPS: {self.fps}")
+                    cv2.moveWindow("Camera", wx, wy)
                     cv2.waitKey(1)
                 
                 yield self.current_frame
@@ -330,9 +337,12 @@ class AsyncCam:
                 print(exc)
 
 if __name__ == "__main__":
-    cam = AsyncCam([800, 800])
+    config = load_config()
+    
+    cam = AsyncCam([800, 800], config["center"])
+    cam.set_masks(config["cameraMasks"])
     cam.debug = True
     async def start():
-        async for _ in cam.main():
+        async for _ in cam.main(display=True):
             pass
     asyncio.run(start())
