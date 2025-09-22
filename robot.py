@@ -88,7 +88,43 @@ def collide_point_quadrilateral(point: tuple, quadrilateral: list[tuple]) -> str
         if side: delta[i] = 0
     
     return delta, [t1, t2, t3, t4]
+    
+def determine_position(aB, dB, aY, dY, width = 123.0, length = 183.0):
 
+    dY_squared = pow(dY, 2)
+    dB_squared = pow(dB, 2)
+    length_squared = pow(length, 2)
+
+    a_Yray = math.radians(90 - aY)
+    a_Bray = math.radians(90 - aB)
+
+    a = (dY_squared - dB_squared) * (1 + pow(math.tan(a_Yray), 2))
+    b = -2 * length * dY_squared * math.tan(a_Yray)
+    c = length_squared * dY_squared
+    x_mean = (-b + sign(aY) * math.sqrt(abs(pow(b, 2) - 4 * a * c))) / (2 * a)
+
+    if dY / dB == 1:
+        y_approx = 0
+    else:
+        a = (dY_squared - dB_squared)
+        b = -2 * length * dB_squared
+        c = (dY_squared - dB_squared) * pow(x_mean, 2) - length_squared * dB_squared
+        y_approx = (-b - math.sqrt(pow(b, 2) - 4 * a * c)) / (2 * a)
+    
+    s = 0.5 * (dY + dB + length)
+    if length > s: return
+    
+    x_3 = - (2 / length) * sign(aY) * math.sqrt(s * (s - dY) * (s - dB) * (s - length))
+    y_3 = 0.5 * x_3 * (math.tan(math.radians(90 - aY)) + math.tan(math.radians(90 - aB)))
+
+    t = clamp_lerp(abs(x_3), 0.1 * width, 0.5 * width)
+    x_sol = lerp(x_mean, x_3, t)
+    if y_3 is None:
+        y_sol = y_approx
+    else:
+        y_sol = lerp(y_approx, y_3, t)
+    return (x_sol, y_sol)
+    
 class Goal:
     Yellow = "Yellow"
     Blue = "Blue"
@@ -163,6 +199,7 @@ class Blackboard:
     pastAttackingDistances: list[float] = np.zeros(1 + NUM_SAMPLES, dtype=np.int32)
     meanAttackingDistance: float = None
     defendingAngle: float = None
+    lastDefendingAngle: float = None
     defendingDistance: float = None
     lastYellowAngle: float = None
     lastYellowDistance: float = None
@@ -173,6 +210,8 @@ class Blackboard:
     isKicking: bool = False
     kickedTicks: int = 0
     currTurn: float = 0
+    currDrive: list = [0, 0]
+    lastNormal = None
 class Robot:
     def __init__(self):
         
@@ -205,8 +244,8 @@ class Robot:
         self.utils.switch_right = Button(self.config["addresses"]["switchRight"], pull_up=False)
         
         self.mode: int = Mode.Idle
-        self.state: str = State.Chasing
-        self.previous_state: str = State.Chasing
+        self.state: str = State.Defending # State.Chasing
+        self.previous_state: str = self.state
         self.bb = Blackboard()
         
         self.is_goalie: bool = False#True
@@ -238,6 +277,19 @@ class Robot:
         bl = compute_pos_from_corner(self.corners["BottomLeft"], self.front, self.back)
         self.quadrilateral = [tl, tr, bl, br]
         
+        
+        print(*[(int(x[0]), int(x[1])) for x in self.quadrilateral])
+        # ~ f = self.corners["TopLeft"]["yellow"]
+        # ~ b = self.corners["TopLeft"]["blue"]
+        # ~ self.left = max(self.quadrilateral[0][0], self.quadrilateral[2][0])
+        # ~ self.right = min(self.quadrilateral[1][0], self.quadrilateral[3][0])
+        # ~ self.width = self.right - self.left
+        # ~ self.top = min(self.quadrilateral[0][1], self.quadrilateral[1][1])
+        # ~ self.bottom = max(self.quadrilateral[2][1], self.quadrilateral[3][1])
+        # ~ self.length = self.top - self.bottom
+        # ~ print(self.left, self.right, self.top, self.bottom)
+        # ~ print(determine_position(f["angle"], f["dist"], b["angle"], b["dist"], width=self.width, length = self.length))
+        
         self.utils.camera.set_masks(self.config["cameraMasks"])
         self.prev: float = now()
         self.dt: float = 1/60
@@ -265,18 +317,24 @@ class Robot:
         normal = [0, 0]
         
         delta, t = collide_point_quadrilateral(pos, self.quadrilateral)
+        # ~ print(delta)
 
         mag = 2.0
         # Right
-        normal[0] -= delta[0]
+        normal[0] -= abs(delta[0])
         # Left
-        normal[0] += delta[1]
+        normal[0] += abs(delta[1])
         # Top
-        normal[1] -= delta[2]
+        normal[1] -= abs(delta[2])
         # Bottom
-        normal[1] += delta[3]
+        normal[1] += abs(delta[3])
             
-        if normal == [0, 0]: return
+        if normal == [0, 0]:
+            if self.vars.outOfBoundsTicks > 0:
+                normal = self.bb.lastNormal.copy()
+            else:
+                return
+        self.bb.lastNormal = normal.copy()
         
         normal_direction = math.degrees(math.atan2(normal[0], normal[1]))
         normal_magnitude = math.sqrt(pow(normal[0], 2) + pow(normal[1], 2))
@@ -285,17 +343,19 @@ class Robot:
         diffAngle = abs(deltaAngle)
         
         # If they're pointing in the same direction. Also if its REALLY out then just push it out
-        if diffAngle <= 90 and normal_magnitude < 6.7: return
+        if diffAngle <= 90 and normal_magnitude < 10.0: return
         
         # Perpendicular = 1 * original speed, Antiparallel = 0
-        new_speed = (0.1 + 0.9 * math.sin(math.radians(diffAngle))) * speed
-        da = lerp(0, 90, clamp_lerp(normal_magnitude, 0, 20))
+        t = clamp_lerp(normal_magnitude, 3, 25)
+        new_speed = (0.05 + 0.95 * math.sin(math.radians(diffAngle))) * abs(speed)
+        # ~ new_speed = lerp(new_speed, 1, t)
+        da = lerp(0, 90, t)
         if normalise(deltaAngle + self.vars.heading) > 0:
             new_direction = normal_direction + (90 - da) + self.vars.heading
         else:
             new_direction = normal_direction - (90 - da) + self.vars.heading
         
-        return (new_direction, new_speed)
+        return (normalise(new_direction), new_speed)
         
     async def drive_in_direction(self, angle: float, speed: float, contribution: float = 1.0, oob_angle: float = 15.0):
         # First pass for out of bounds with angle checking.
@@ -334,13 +394,38 @@ class Robot:
                     # ~ else:
                         # ~ angle = clamp(self.utils.camera.yellow_angle - 90, oob_angle, 90)
         
+        # Goal distance checking
+        # ~ dist_to_goals = 30.0 # 45.0
+        # ~ movement_decided = False
+        # ~ if self.utils.camera.yellow_angle:
+            # ~ if self.utils.camera.yellow_distance <= dist_to_goals:
+                # ~ movement_decided = True
+                # ~ deltaAngle = normalise(angle - self.utils.camera.yellow_angle)
+                # ~ normal_magnitude = dist_to_goals - self.utils.camera.yellow_distance
+                # ~ if abs(deltaAngle) <= 90:
+                    # ~ da = lerp(0, 90, clamp_lerp(normal_magnitude, 0.0, 7.0))
+                    # ~ if deltaAngle > 0:
+                        # ~ angle = self.utils.camera.yellow_angle - 180 - (90 - da)
+                    # ~ else:
+                        # ~ angle = self.utils.camera.yellow_angle - 180 + (90 - da)
+        # ~ if not movement_decided and self.utils.camera.blue_angle:
+            # ~ if self.utils.camera.blue_distance <= dist_to_goals:
+                # ~ deltaAngle = normalise(angle - self.utils.camera.blue_angle)
+                # ~ normal_magnitude = dist_to_goals - self.utils.camera.blue_distance
+                # ~ if abs(deltaAngle) <= 90:
+                    # ~ da = lerp(0, 90, clamp_lerp(normal_magnitude, 0.0, 7.0))
+                    # ~ if deltaAngle > 0:
+                        # ~ angle = self.utils.camera.blue_angle - 180 - (90 - da)
+                    # ~ else:
+                        # ~ angle = self.utils.camera.blue_angle - 180 + (90 - da)
+        
         # Second pass for position checking
         new_angle_speed_pair = self.compute_new_direction_vector(angle, speed)
         self.vars.outOfBounds = False
         self.vars.outOfBoundsTicks -= 1
         if new_angle_speed_pair is not None:
             self.vars.outOfBounds = True
-            self.vars.outOfBoundsTicks = 30
+            self.vars.outOfBoundsTicks = 5
             angle, speed = new_angle_speed_pair
         # ~ print(new_angle_speed_pair is not None, round(angle), round(speed, 2))
         
@@ -376,7 +461,6 @@ class Robot:
         self.utils.motors[1].set_speed(self.future_motor_speeds[1])
         self.utils.motors[2].set_speed(self.future_motor_speeds[2])
         self.utils.motors[3].set_speed(self.future_motor_speeds[3])
-        # ~ print([int(100 * x) for x in self.future_motor_speeds])
         self.future_motor_speeds = [0, 0, 0, 0]
         
     async def reverse_dribbler(self):
@@ -436,20 +520,19 @@ class Robot:
                 
             # Back up to the goal.
             if self.bb.defendingDistance is not None:
-                speed = 0.05 * smooth_linear(self.bb.defendingDistance - self.vars.backingDistance)
-                await self.drive_in_direction(self.bb.defendingAngle + self.vars.heading, speed, 0.5)
+                speed = 0.10 * smooth_linear(self.bb.defendingDistance - self.vars.backingDistance)
+                await self.drive_in_direction(self.bb.defendingAngle + self.vars.heading, speed, 0.67)
             else:
-                # ~ speed = 0.25 * smooth_linear(self.bb.yPosition)
                 speed = 0.7
-                await self.drive_in_direction(180 + self.vars.heading, speed, 0.9)
+                await self.drive_in_direction(180 + self.vars.heading, speed, 0.5)
         
             await self.turn(-self.vars.heading * self.vars.maintain_orientation_speed, contribution=0.4)
             
             # Center yourself
             a = normalise(localisation_angle - self.vars.heading + 180)
-            speed = smooth_linear((a + 90) % 180 - 90, 1000)
+            speed = 0.5 * smooth_linear((a + 90) % 180 - 90, a = 300)
             if abs(a) >= 90: speed *= -1
-            await self.drive_in_direction(self.vars.heading - 90, 0.1 * speed, 0.2)
+            await self.drive_in_direction(self.vars.heading - 90, speed, 0.5)
                 
             await self.confirm_drive()
             await self.stop_dribbler()
@@ -457,6 +540,8 @@ class Robot:
             
         if self.state in [State.Chasing, State.Defending]:
             self.previous_state = self.state
+            if not self.bb.isKicking and self.bb.kickedTicks > 0:
+                self.bb.kickedTicks = self.bb.kickedTicks - 1
         
         if self.state in [State.Chasing, State.Shooting] and self.is_goalie:
             if self.bb.defendingDistance >= self.bb.returnToGoalThreshold: # or received 'I got this' message from other robot
@@ -468,12 +553,14 @@ class Robot:
             Follow ball polynomial (with prediction of ball velocity?)
             Face north
             """
-
+            
             # Transition from chasing to shooting if ball is held long enough.
             if self.vars.has_ball >= 110:
                 self.bb.targetDirection = None
                 self.state = State.Shooting
+                self.bb.leavingGoal = False
                 self.bb.currTurn = 0
+                self.bb.currDrive = [0, 0]
                 return
             
             # If facing roughly forward
@@ -520,7 +607,7 @@ class Robot:
             # Go back to chasing if the ball is too far away
             ca = self.utils.camera.angle if self.utils.camera.angle else 0
             # ~ if not (abs(ca) <= 45 or self.utils.camera.angle is None) or self.vars.ball_distance >= 21.0:
-            if self.vars.has_ball < 75:
+            if self.vars.has_ball < 75 and self.bb.kickedTicks <= 0:
                 self.state = State.Chasing
             
             # ~ # If the goals are not visible, just drive forward
@@ -551,7 +638,7 @@ class Robot:
                     self.bb.previousTargetDirection = self.bb.targetDirection
                     self.bb.capturedSpeed = self.vars.lastSpeed
                     self.bb.atAttackingGoalTicks = 0
-                    self.bb.kickedTicks = 0
+                    self.bb.isKicking = False
             # If facing backwards, like when it just collected the ball after it dropped it
             else:
                 self.bb.targetDirection = self.bb.previousTargetDirection
@@ -563,17 +650,18 @@ class Robot:
             goalGlobalAngle = attackingAngle - self.vars.heading
             backwardsAngle = normalise(goalGlobalAngle + 100 * sign(self.bb.targetDirection))
             newAngle = angle_lerp(self.bb.targetDirection, backwardsAngle, t * max(0, 0.3 - self.bb.capturedSpeed) / 0.3)
-            newAngle = angle_lerp(newAngle, 0, clamp_lerp(attackingDistance, 100, 67))
+            # ~ newAngle = angle_lerp(newAngle, 0, clamp_lerp(attackingDistance, 100, 67))
             deltaAngle = normalise(self.vars.heading - newAngle)
             
             TF = 0.005
-            LF = 0.3
+            LF = 0.5
             
             # Drives and lerps the speed down so that the ball can be captured
             if abs(deltaAngle) >= 30 and self.bb.atAttackingGoalTicks <= 0 and self.bb.capturedSpeed >= 0.10:
                 self.bb.currTurn = angle_lerp(self.bb.currTurn, -deltaAngle * TF, LF)
                 await self.turn(self.bb.currTurn, 0.8)
-                await self.drive_in_direction(0 + self.vars.heading * 1.0, self.bb.capturedSpeed, contribution = 1.0)
+                self.bb.currDrive[0] = angle_lerp(self.bb.currDrive[0], 0 + self.vars.heading * 1.0, LF)
+                await self.drive_in_direction(self.bb.currDrive[0], self.bb.capturedSpeed, contribution = 1.0)
                 await self.confirm_drive()
                 return
             
@@ -584,9 +672,11 @@ class Robot:
                 self.bb.atAttackingGoalTicks = 30
             if self.bb.atAttackingGoalTicks <= 0:
                 self.bb.currTurn = angle_lerp(self.bb.currTurn, -deltaAngle * TF, LF)
-                await self.turn(self.bb.currTurn, 0.3)
+                await self.turn(self.bb.currTurn, 0.8)
                 angle = angle_lerp(self.vars.heading + 0, attackingAngle, t = clamp_lerp(attackingDistance, 43, 27))
-                await self.drive_in_direction(angle, 0.5, 0.8)
+                self.bb.currDrive[0] = angle_lerp(self.bb.currDrive[0], angle, LF)
+                self.bb.currDrive[1] = lerp(self.bb.currDrive[1], 0.5, LF)
+                await self.drive_in_direction(*self.bb.currDrive, 0.8)
                 await self.confirm_drive()
                 return
             
@@ -603,17 +693,19 @@ class Robot:
             
             # Drive/kick towards the goal.
             self.bb.currTurn = angle_lerp(self.bb.currTurn, -TF * abs(attackingAngle) * sign(self.bb.targetDirection), LF)
-            await self.turn(self.bb.currTurn, 0.65)
+            await self.turn(self.bb.currTurn, 0.67)
             i = self.bb.pastAttackingAngles[-1]
-            if abs(self.bb.pastAttackingAngles[i]) <= 15:
+            if self.bb.isKicking or abs(self.bb.pastAttackingAngles[i]) <= 10.0:
                 self.bb.isKicking = True
                 await self.reverse_dribbler()
                 self.bb.kickedTicks += 1
                 
                 if self.bb.kickedTicks <= 17:
-                    await self.drive_in_direction(0, 4.1, 1.0)
+                    await self.drive_in_direction(0, 4.167, 1.0)
+                elif self.bb.kickedTicks <= 34:
+                    await self.drive_in_direction(180 + self.vars.heading, 0.5, 1.0)
                 else:
-                    await self.drive_in_direction(0, -0.5, 1.0)
+                    self.state = State.Defending
                 
             await self.confirm_drive()
                 
@@ -624,18 +716,6 @@ class Robot:
             Face towards ball/northward.
             """
             
-            # This will be for the goalie
-            if self.is_goalie:
-                if self.bb.leavingGoal:
-                    self.state == State.Chasing
-                    return
-                if self.vars.ball_distance <= 40.0 and abs(self.vars.ball_angle) <= 50.0 and self.atDefenderGoal:
-                    self.bb.leavingGoal = True
-                    self.state == State.Chasing
-                    return
-                self.bb.leavingGoal = False
-                
-                
             self.bb.goalTicks += 1
             
             if self.vars.target_goal == Goal.Blue:
@@ -645,26 +725,55 @@ class Robot:
                 backing_distance = self.utils.camera.blue_distance
                 localisation_angle = self.utils.camera.blue_angle
             
-            # Back up to the goal.
-            if backing_distance is not None:
-                await self.drive_in_direction(180, 0.5 * smooth_linear(backing_distance - self.vars.backingDistance), 1.0)
-        
-            # If goals can't be found, just spin.
+            # If goals not seen, spin.
             if localisation_angle is None:
-                await self.turn(0.1, 1.0)
+                await self.turn(0.167, 1.0)
                 await self.confirm_drive()
                 return
                 
-            await self.turn(-self.vars.heading * self.vars.maintain_orientation_speed, contribution=0.67)
+            # Back up to the goal.
+            if self.bb.defendingDistance is not None:
+                speed = 0.05 * smooth_linear(self.bb.defendingDistance - self.vars.backingDistance, a = 600)
+                await self.drive_in_direction(self.bb.defendingAngle + self.vars.heading, speed, 0.5)
+            else:
+                speed = self.vars.drive_speed
+                await self.drive_in_direction(180 + self.vars.heading, speed, 0.5)
             
-            # Center yourself
-            offset = 30 * math.sin(self.bb.goalTicks * .024)
-            a = normalise(localisation_angle + offset - self.vars.heading)
-            speed = self.vars.center_speed * (1 - math.cos(math.radians(3 * ((a + 90) % 180 - 90))))
-            await self.drive_in_direction(self.vars.heading + 90, speed * sign(a), 1.0)
+            
+            # If ball not seen
+            if self.utils.camera.angle is None:
+                # Center yourself
+                a = normalise(localisation_angle - self.vars.heading + 180)
+                speed = 0.5 * smooth_linear((a + 90) % 180 - 90, a = 670)
+                if abs(a) >= 90: speed *= -1
+                await self.drive_in_direction(self.vars.heading - 90, speed, 0.5)
+                await self.turn(-self.vars.heading * self.vars.maintain_orientation_speed, contribution=0.67)
+                
+            else:
+                # Position between ball and goal
+                a = normalise(self.utils.camera.angle - self.vars.heading)
+                speed = 0.5 * smooth_linear((a + 90) % 180 - 90, a = 670)
+                if abs(a) >= 90: speed *= -1
+                await self.drive_in_direction(self.vars.heading + 90, speed, 0.5)
+                await self.turn(-self.vars.heading * self.vars.maintain_orientation_speed, contribution=0.67)
+                # ~ await self.turn(-normalise(self.bb.lastDefendingAngle - 180) * 0.04, contribution=0.5)
+            
+                # This will be for the goalie
+                if self.bb.kickedTicks <= 0:
+                    if self.bb.leavingGoal:
+                        self.state = State.Chasing
+                        await self.confirm_drive()
+                        return
+                    if abs(a) > 110 or (self.vars.ball_distance <= 30.0 and abs(self.vars.ball_angle) <= 25.0):
+                        self.bb.leavingGoal = True
+                        self.state = State.Chasing
+                        await self.confirm_drive()
+                        return
+                    self.bb.leavingGoal = False
                 
             await self.confirm_drive()
-            
+            await self.stop_dribbler()
+                
         elif self.state == State.Stalled:
             """
             TO FIND STALLED STATE: Read encoders to see if things are thingy
@@ -792,6 +901,10 @@ class Robot:
                     # ~ "capturedSpeed": self.bb.capturedSpeed
                     "position": self.vars.position,
                     "lastSpeed": self.vars.lastSpeed,
+                    # ~ "self.bb.currTurn": self.bb.currTurn,
+                    "lastNormal": self.bb.lastNormal,
+                    "orientation": self.vars.heading,
+                    "currDrive": self.bb.currDrive,
                     "OOB": self.vars.outOfBounds
                 }
                 for key, val in v.items():
@@ -826,8 +939,8 @@ class Robot:
                 self.vars.lastGlobalYellowAngle = normalise(self.utils.camera.yellow_angle - self.vars.heading)
                 self.vars.lastGlobalYellowDistance = self.utils.camera.yellow_distance
             if self.utils.camera.blue_angle is not None:
-                self.bb.lastblueAngle = self.utils.camera.blue_angle
-                self.bb.lastblueDistance = self.utils.camera.blue_distance
+                self.bb.lastBlueAngle = self.utils.camera.blue_angle
+                self.bb.lastBlueDistance = self.utils.camera.blue_distance
                 self.vars.lastGlobalBlueAngle = normalise(self.utils.camera.blue_angle - self.vars.heading)
                 self.vars.lastGlobalBlueDistance = self.utils.camera.blue_distance
             if self.vars.target_goal == Goal.Yellow:
@@ -848,11 +961,13 @@ class Robot:
                 self.bb.pastAttackingAngles[-1] = (i + 1) % NUM_SAMPLES
                 self.bb.meanAttackingAngle = np.mean(self.bb.pastAttackingAngles[:NUM_SAMPLES])
             if self.bb.attackingDistance is not None:
-                self.bb.atAttackingGoal = self.bb.atAttackingGoal or bool(self.bb.attackingDistance < 32.0)
+                self.bb.atAttackingGoal = self.bb.atAttackingGoal or bool(self.bb.attackingDistance < 45.0)
                 i = self.bb.pastAttackingDistances[-1]
                 self.bb.pastAttackingDistances[i] = self.bb.attackingDistance
                 self.bb.pastAttackingDistances[-1] = (i + 1) % NUM_SAMPLES
                 self.bb.meanAttackingDistance = np.mean(self.bb.pastAttackingDistances[:NUM_SAMPLES])
+            if self.bb.defendingAngle is not None:
+                self.bb.lastDefendingAngle = self.bb.defendingAngle
             if self.bb.defendingDistance is not None:
                 self.bb.atDefenderGoal = bool(self.bb.defendingDistance <= 45.0)
             

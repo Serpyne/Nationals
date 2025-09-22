@@ -157,7 +157,6 @@ class AsyncCam:
         self.body_masks.clear()
         for mask in masks:
             if mask["type"] == "circle":
-                print(mask["center"])
                 self.body_masks.append(Circle(mask["center"], mask["radius"], mask["colour"]))
             elif mask["type"] == "rect":
                 self.body_masks.append(Rect(mask["x"], mask["y"], mask["w"], mask["h"], mask["colour"]))
