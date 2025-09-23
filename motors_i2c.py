@@ -7,7 +7,7 @@ import time
 import struct
 import asyncio
 
-MAX_SPEED = 100_000_000
+MAX_SPEED = 92_000_000
 
 def clamp(value, a, b):
     return max(a, min(value, b))

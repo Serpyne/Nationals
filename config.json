@@ -28,7 +28,7 @@
         "x4": 8.243e-06,
         "x5": -2.124e-08
     },
-    "backingDistance": 41.0,
+    "backingDistance": 21.0,
     "blindnessTimer": 200,
     "cameraMasks": [
         {
@@ -42,7 +42,7 @@
                 255
             ],
             "endAngle": 309,
-            "radius": 203,
+            "radius": 207,
             "startAngle": 52,
             "type": "sector"
         },
@@ -126,63 +126,63 @@
             255
         ],
         "yellow": [
-            19,
-            242,
+            161,
             148,
-            24,
-            255,
-            185
+            155,
+            179,
+            239,
+            200
         ]
     },
     "corners": {
         "BottomLeft": {
             "blue": {
-                "angle": -15.979659182429145,
-                "dist": 102.0457662999338
+                "angle": 16.9089523360733,
+                "dist": 85.87515949475386
             },
             "front": "blue",
             "yellow": {
-                "angle": 105.04165428266288,
-                "dist": 30.2008412238093
+                "angle": 108.69397477233417,
+                "dist": 26.938214198156373
             }
         },
         "BottomRight": {
             "blue": {
-                "angle": -7.858393950401108,
-                "dist": 106.79580174607437
+                "angle": -17.436707232228628,
+                "dist": 86.60036363377469
             },
             "front": "blue",
             "yellow": {
-                "angle": -122.256862808484,
-                "dist": 25.054037150200276
+                "angle": -111.11105489263511,
+                "dist": 29.161535222242644
             }
         },
         "TopLeft": {
             "blue": {
-                "angle": 52.68215165117152,
-                "dist": 26.019243365927892
+                "angle": 62.468663525473914,
+                "dist": 23.618401812530518
             },
             "front": "blue",
             "yellow": {
-                "angle": -194.75396119087617,
-                "dist": 99.55155455446491
+                "angle": 163.7317586008707,
+                "dist": 90.21171464617849
             }
         },
         "TopRight": {
             "blue": {
-                "angle": -52.6747168381805,
-                "dist": 24.465090676495354
+                "angle": -60.5969607892641,
+                "dist": 24.06114118937751
             },
             "front": "blue",
             "yellow": {
-                "angle": -170.86613775836094,
-                "dist": 95.25160691709382
+                "angle": -167.35117752159903,
+                "dist": 87.4427763043704
             }
         }
     },
     "directionBias": 50000000,
     "id": "TS-chopped",
-    "maintainOrientationTurnSpeed": 0.03,
+    "maintainOrientationTurnSpeed": 0.067,
     "settings": {
         "ball": {
             "maximum_span": 49.8,
@@ -211,13 +211,13 @@
         }
     },
     "speedBias": {
-        "forwardDamping": -0.41,
-        "sideDamping": 0.3
+        "forwardDamping": -0.50,
+        "sideDamping": 0.15
     },
-    "speedCenter": 1.0,
-    "speedDribble": 0.7,
+    "speedCenter": 0.05,
+    "speedDribble": 0.70,
     "speedDrive": 0.9,
-    "speedMax": 1.0,
+    "speedMax": 0.9,
     "targetGoal": "yellow",
     "tofPositions": [
         36,
