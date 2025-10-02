@@ -1,39 +1,57 @@
 import numpy as np
 import board
+from ahrs.filters import Madgwick
+from ahrs.common.orientation import q2euler
+from time import sleep, perf_counter as now
+
 from adafruit_bno08x.i2c import BNO08X_I2C
-from adafruit_bno08x import BNO_REPORT_ROTATION_VECTOR
-import time
+from adafruit_bno08x import (BNO_REPORT_LINEAR_ACCELERATION,
+                            BNO_REPORT_GYROSCOPE,
+                            BNO_REPORT_MAGNETOMETER)
 
 class Compass:
     def __init__(self, address: int = 0x4a):
         self.i2c = board.I2C()
         self.bno = BNO08X_I2C(self.i2c, address=address)
-        time.sleep(0.41)
+        sleep(0.1)
+        
+        self.madg = None
         self.enabled = False
         try:
-            self.bno.enable_feature(BNO_REPORT_ROTATION_VECTOR)
+            self.bno.enable_feature(BNO_REPORT_LINEAR_ACCELERATION)
+            self.bno.enable_feature(BNO_REPORT_GYROSCOPE)
+            self.bno.enable_feature(BNO_REPORT_MAGNETOMETER)
+            
             print(f"Compass {hex(address)} initialised")
+            
             self.enabled = True
+            sleep(0.1)
+            
+            self.madg = Madgwick(mag=self.bno.magnetic)
+            self.madg_sample = np.array([1.,0.,0.,0.])
+            self.prev = now()
+            
         except Exception as e:
             print(f"NOT INITIALISED: Compass {hex(address)}; ", e)
     
     def read(self):
         "Get the yaw component of the BNO08x compass sensor"
-        quat = self.bno.quaternion
-        w, x, y, z = quat[3], quat[0], quat[1], quat[2]
-        yaw = np.arctan2(2.0 * (w * z + x * y), 1.0 - 2.0 * (y**2 + z**2))
-        yaw_deg = np.degrees(yaw) % 360
-        return yaw_deg
-
-    def calibration(self):
-        return self.bno.calibration_status
+        if self.madg is None: return
         
+        curr = now()
+        self.madg.Dt = curr - self.prev
+        self.prev = curr
+        
+        self.madg_sample = self.madg.updateIMU(q = self.madg_sample, gyr = self.bno.gyro, acc = self.bno.linear_acceleration)
+        
+        return np.degrees(q2euler(self.madg_sample)[2]) # returns yaw component
+
 if __name__ == "__main__":
 	c = Compass(0x4a)
 	
-	time.sleep(0.5)
+	sleep(0.5)
 	initial = c.read()
-	time.sleep(0.5)
+	sleep(0.5)
 	while True:
 		print(f"{c.read() - initial:.3f}")
-		time.sleep(1 / 60)
+		sleep(1 / 60)

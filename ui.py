@@ -133,7 +133,7 @@ class AsyncCam:
         self.elapsed: float = 0
         self.fps = 0
         
-        self.mask_types = ["ball", "yellow", "blue", "lines", "field"]
+        self.mask_types = ["ball", "yellow", "hands", "blue", "lines", "field"]
         self.current_mask: int = 0
         self.show_hull: bool = True
         self.conglomerator = Conglomerator()
@@ -151,6 +151,7 @@ class AsyncCam:
         self.blue = ColorRange(colours["blue"][:3], colours["blue"][3:])
         self.lines = ColorRange(colours["lines"][:3], colours["lines"][3:])
         self.field = ColorRange(colours["field"][:3], colours["field"][3:])
+        self.hands = ColorRange(colours["hands"][:3], colours["hands"][3:])
         
         self.angle = {"yellow": None, "blue": None}
         self.distance = {"yellow": None, "blue": None}
@@ -177,6 +178,8 @@ class AsyncCam:
             self.lines.set(lower_upper, hs_or_v, value)
         elif mask_type == "field":
             self.field.set(lower_upper, hs_or_v, value)
+        elif mask_type == "hands":
+            self.hands.set(lower_upper, hs_or_v, value)
         
     def set_hull_visibility(self, value: bool):
         self.show_hull = bool(value)
@@ -210,7 +213,7 @@ class AsyncCam:
     
     def process(self, frame: cv2.typing.MatLike, mask_index = None) -> cv2.typing.MatLike:
         hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
-        frame = cv2.circle(frame, [394, 418], 444, (0, 0, 0), 30)
+        frame = cv2.circle(frame, [296, 314], 333, (0, 0, 0), 34)
         self.draw_body_masks(frame, filled=False)
         self.draw_body_masks(hsv, filled=True)
         
@@ -221,20 +224,29 @@ class AsyncCam:
         elif mask_index == 1:
             mask = cv2.inRange(hsv, self.yellow.min, self.yellow.max)
         elif mask_index == 2:
-            mask = cv2.inRange(hsv, self.blue.min, self.blue.max)
+            mask = cv2.inRange(hsv, self.hands.min, self.hands.max)
         elif mask_index == 3:
-            mask = cv2.inRange(hsv, self.lines.min, self.lines.max)
+            mask = cv2.inRange(hsv, self.blue.min, self.blue.max)
         elif mask_index == 4:
+            mask = cv2.inRange(hsv, self.lines.min, self.lines.max)
+        elif mask_index == 5:
             mask = cv2.inRange(hsv, self.field.min, self.field.max)
         else: # Corners
-            for i in [1, 2]:
+            for i in [1, 3]:
                 frame = self.process(frame, i)
             
             return frame
             
+        # Filter hands
+        hands_mask = cv2.inRange(hsv, self.hands.min, self.hands.max)
+        hand_contours, _ = cv2.findContours(hands_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        cv2.drawContours(frame, hand_contours, -1, (0, 0, 0), -1)
+        if mask_index == 2:
+            return frame
+            
         contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         
-        if mask_index is None:
+        if mask_index is None or 1:
             self.current_contours = contours
             
             if self.selected_contour is not None:
@@ -258,7 +270,10 @@ class AsyncCam:
                 self.distance[name] = None
                 return frame
             else:
-                if name not in self.angle: return frame
+                cv2.drawContours(frame, [conglomerate], 0, (255, 255, 255))
+                
+                if name not in self.angle:
+                    return frame
                 
                 M = cv2.moments(conglomerate)
                 centroid = [M['m10'] // M['m00'], M['m01'] // M['m00']]
@@ -271,8 +286,6 @@ class AsyncCam:
                 self.angle[name] = angle_lerp(self.angle[name], true_angle, t = 0.67)
                 if self.distance[name] is None: self.distance[name] = true_distance
                 self.distance[name] = lerp(self.distance[name], true_distance, t = 0.67)
-        
-            cv2.drawContours(frame, [conglomerate], 0, (255, 255, 255))
         
         return frame
     
@@ -340,19 +353,24 @@ class Tab(ttk.Frame):
         
         settings = {"font_family": "Adobe Caslon Pro", "padX": 20, "Width": 800, "font_size": 14, "digit_precision": ".0f", "line_width": 10, "bar_radius": 15}
         
-        tk.Label(self, text="Hue").grid(column=0, row=0) 
-        self.hueSlider = RangeSliderH(self, self.hsvVars[0], min_val = 0, max_val = 180, suffix="°", **settings)
+        self.main_colour_frame = tk.Frame(self)
+        self.main_colour_frame.pack(side=tk.LEFT)
+        self.other_colour_frame = tk.Frame(self)
+        self.other_colour_frame.pack(side=tk.RIGHT)
+        
+        tk.Label(self.main_colour_frame, text="Hue").grid(column=0, row=0) 
+        self.hueSlider = RangeSliderH(self.main_colour_frame, self.hsvVars[0], min_val = 0, max_val = 180, suffix="°", **settings)
         self.hueSlider.grid(column=1, row=0) 
         
-        tk.Label(self, text="Saturation").grid(column=0, row=1, padx = 50) 
-        self.saturationSlider = RangeSliderH(self, self.hsvVars[1], min_val = 0, max_val = 255, **settings)
+        tk.Label(self.main_colour_frame, text="Saturation").grid(column=0, row=1, padx = 50) 
+        self.saturationSlider = RangeSliderH(self.main_colour_frame, self.hsvVars[1], min_val = 0, max_val = 255, **settings)
         self.saturationSlider.grid(column=1, row=1)
         
-        tk.Label(self, text="Value").grid(column=0, row=2) 
-        self.valueSlider = RangeSliderH(self, self.hsvVars[2], min_val = 0, max_val = 255, **settings)
+        tk.Label(self.main_colour_frame, text="Value").grid(column=0, row=2) 
+        self.valueSlider = RangeSliderH(self.main_colour_frame, self.hsvVars[2], min_val = 0, max_val = 255, **settings)
         self.valueSlider.grid(column=1, row=2)
         
-        self.save_button = tk.Button(self, text="Save " + title,
+        self.save_button = tk.Button(self.main_colour_frame, text="Save " + title,
                         command = lambda: save_colour_to_config(config_key, [ self.hsvVars[i][b].get() for b in range(2) for i in range(3)]))
         self.save_button.grid(column=0,row=3)
         
@@ -366,13 +384,13 @@ class Tab(ttk.Frame):
             tk.IntVar(value = settings["minimum_conglomerate"])
         ]
         self.conglomerate_sliders = [
-            tk.Scale(self, from_=0.1, to=1000.0, resolution=0.1, orient=tk.HORIZONTAL, variable=self.conglomerate_vars[0]),
-            tk.Scale(self, from_=1, to=30, orient=tk.HORIZONTAL, variable=self.conglomerate_vars[1]),
-            tk.Scale(self, from_=10, to=60, orient=tk.HORIZONTAL, variable=self.conglomerate_vars[2])
+            tk.Scale(self.main_colour_frame, from_=0.1, to=1000.0, resolution=0.1, orient=tk.HORIZONTAL, variable=self.conglomerate_vars[0]),
+            tk.Scale(self.main_colour_frame, from_=1, to=30, orient=tk.HORIZONTAL, variable=self.conglomerate_vars[1]),
+            tk.Scale(self.main_colour_frame, from_=10, to=60, orient=tk.HORIZONTAL, variable=self.conglomerate_vars[2])
         ]
         
         for i, label in enumerate(["Maximum Span", "Minimum Contour Size", "Minimum Conglomerate"]):
-            tk.Label(self, text=label).grid(column=0, row=4 + i)
+            tk.Label(self.main_colour_frame, text=label).grid(column=0, row=4 + i)
             self.conglomerate_sliders[i].grid(column=1,row=4 + i, sticky="EW")
         
 class ColorUI:
@@ -384,13 +402,18 @@ class ColorUI:
         self.notebook = ttk.Notebook(root)
         self.notebook.pack(expand=True, fill="both")
         
-        colours = load_config()["colours"]
+        
+        config = load_config()
+        colours = config["colours"]
         
         self.ball_tab = Tab(self.notebook, title="Ball Mask", initial_hsv_state = colours["ball"], config_key="ball")
         self.notebook.add(self.ball_tab, text="Ball")
         
         self.yellow_tab = Tab(self.notebook, title="Yellow Mask", initial_hsv_state = colours["yellow"], config_key="yellow")
         self.notebook.add(self.yellow_tab, text="Yellow")
+        
+        self.hands_tab = Tab(self.notebook, title="Hands Mask", initial_hsv_state = colours["hands"], config_key="hands")
+        self.notebook.add(self.hands_tab, text="Hands")
         
         self.blue_tab = Tab(self.notebook, title="Blue Mask", initial_hsv_state = colours["blue"], config_key="blue")
         self.notebook.add(self.blue_tab, text="Blue")
@@ -537,7 +560,7 @@ if __name__ == "__main__":
     app.geometry("+10+10")
     
     ui = ColorUI(app)
-    cam = AsyncCam(ui, [800, 800])
+    cam = AsyncCam(ui, [600, 600])
 
     for b in range(2):
         for i in range(3):
@@ -546,6 +569,7 @@ if __name__ == "__main__":
             ui.blue_tab.hsvVars[i][b].trace("w", lambda *_, b=b, i=i: cam.configure("blue", i, b, ui.blue_tab.hsvVars[i][b].get()))
             ui.lines_tab.hsvVars[i][b].trace("w", lambda *_, b=b, i=i: cam.configure("lines", i, b, ui.lines_tab.hsvVars[i][b].get()))
             ui.field_tab.hsvVars[i][b].trace("w", lambda *_, b=b, i=i: cam.configure("field", i, b, ui.field_tab.hsvVars[i][b].get()))
+            ui.hands_tab.hsvVars[i][b].trace("w", lambda *_, b=b, i=i: cam.configure("hands", i, b, ui.hands_tab.hsvVars[i][b].get()))
         
             ui.ball_tab.conglomerate_vars[i].trace("w", lambda *_, i=i: cam.set_setting("ball", ui.ball_tab.conglomerate_setting_names[i], ui.ball_tab.conglomerate_vars[i].get()))
             ui.ball_tab.conglomerate_sliders[i].bind("<ButtonRelease-1>", lambda _, i=i: save_setting_to_config("ball", ui.ball_tab.conglomerate_setting_names[i], ui.ball_tab.conglomerate_vars[i].get()))
@@ -557,6 +581,8 @@ if __name__ == "__main__":
             ui.lines_tab.conglomerate_sliders[i].bind("<ButtonRelease-1>", lambda _, i=i: save_setting_to_config("lines", ui.lines_tab.conglomerate_setting_names[i], ui.lines_tab.conglomerate_vars[i].get()))
             ui.field_tab.conglomerate_vars[i].trace("w", lambda *_, i=i: cam.set_setting("field", ui.field_tab.conglomerate_setting_names[i], ui.field_tab.conglomerate_vars[i].get()))
             ui.field_tab.conglomerate_sliders[i].bind("<ButtonRelease-1>", lambda _, i=i: save_setting_to_config("field", ui.field_tab.conglomerate_setting_names[i], ui.field_tab.conglomerate_vars[i].get()))
+            ui.hands_tab.conglomerate_vars[i].trace("w", lambda *_, i=i: cam.set_setting("hands", ui.hands_tab.conglomerate_setting_names[i], ui.hands_tab.conglomerate_vars[i].get()))
+            ui.hands_tab.conglomerate_sliders[i].bind("<ButtonRelease-1>", lambda _, i=i: save_setting_to_config("hands", ui.hands_tab.conglomerate_setting_names[i], ui.hands_tab.conglomerate_vars[i].get()))
         
     show_hull = tk.IntVar(value = cam.show_hull)
     show_hull_button = tk.Checkbutton(app, text=f"Show Hull", variable=show_hull, command=lambda: cam.set_hull_visibility(show_hull.get()))

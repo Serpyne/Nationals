@@ -7,7 +7,7 @@ import time
 import struct
 import asyncio
 
-MAX_SPEED = 92_000_000
+MAX_SPEED = 105_000_000
 
 def clamp(value, a, b):
     return max(a, min(value, b))
@@ -22,7 +22,8 @@ class Motor:
                  sin_cos_centre: int = 1251,
                  operating_mode_and_sensor: tuple[int] = (3, 1),
                  command_mode: int = 12,
-                 max_speed: int = None):
+                 max_speed: int = None,
+                 event_loop_delay: float = 0.005):
         self.i2c_address = address
         self.bus = smbus2.SMBus(bus_number)
         self.QDRformat = 0
@@ -38,11 +39,29 @@ class Motor:
         self.configure_command_mode(command_mode)
         
         self.max_speed = max_speed if max_speed is not None else MAX_SPEED
+        self.current_speed: float = 0
+        self.last_speed: float = 0
+        
+        self.event_loop_delay: float = event_loop_delay
 
-    def set_speed(self, speed: int):
+    def event_loop(self):
+        while True:
+            if abs(self.last_speed - self.current_speed) >= 0.01:
+                data = struct.pack("<i", self.current_speed)
+                self.bus.write_i2c_block_data(self.i2c_address, 0x12, list(data))
+            
+            time.sleep(self.event_loop_delay)
+
+    def set_speed(self, speed: int, immediate: bool = False):
+        if not immediate:
+            self.last_speed = self.current_speed
+            self.current_speed = int(self.max_speed * clamp(speed, -1.0, 1.0))
+            return
+            
         try:
-            speed = int(self.max_speed * clamp(speed, -1.0, 1.0))
-            data = struct.pack("<i", speed)
+            self.last_speed = self.current_speed
+            self.current_speed = int(self.max_speed * clamp(speed, -1.0, 1.0))
+            data = struct.pack("<i", self.current_speed)
             self.bus.write_i2c_block_data(self.i2c_address, 0x12, list(data))
         except Exception as e:
             print(f"Error setting Speed: {e}")
@@ -131,59 +150,12 @@ if __name__ == "__main__":
         1: Motor(address=0x1a),
         3: Motor(address=0x1c),
         2: Motor(address=0x1b),
-        "dribbler": Motor(address=0x1e)
+        "dribbler": Motor(address=0x1e, max_speed=260_000_000)
     }
     
-    async def initialise_event_loop(main_func):
-        for index in motors:
-            motor = motors[index]
-            asyncio.create_task(motor.event_loop())
-                
-        main_task = asyncio.create_task(main_func())
-        await asyncio.gather(main_task)
-
-    sequence = [x / 10 for x in range(0, 11)] + [0]
-    # sequence = [0, 1, 0, 1, 0]
-    async def main():
-        set_speed = []
-        measured_speed = []
-        times = []
-
-        t = 0
-        i = 0
-        ticks = 0
-        duration = 1
-        while i < len(sequence) - 1:
-            if t >= duration * 10:
-                t = 0
-                i += 1
-            if t == 0: 
-                print(f"setting speed {sequence[i]}")
-                motors[0].set_speed(sequence[i])
-                
-            res = motors[0].read()
-            print(res)
-            times.append(ticks)
-            set_speed.append(sequence[i])
-            measured_speed.append(res[1] / MAX_SPEED)
-            await asyncio.sleep(0.1)
-            t += 1
-            ticks += 1
-        motors[0].set_speed(0)
-        ...
-        
-        import matplotlib.pyplot as plt
-        
-        plt.figure(figsize=(8, 4))
-        plt.plot(times, measured_speed, marker='o', label='Measured Speed')
-        plt.plot(times, set_speed, linestyle='--', color='gray', label='Ideal (y=x)')
-        plt.xlabel('Set Motor Speed (RPM)')
-        plt.ylabel('Measured Motor Speed (RPM)')
-        plt.title('Motor Set Speed vs. Measured Speed')
-        plt.legend()
-        plt.grid(True)
-        plt.show()
-    
-    loop = asyncio.get_event_loop()
-    loop.run_until_complete(initialise_event_loop(main))
-    loop.run_forever()
+    try:
+        motors["dribbler"].set_speed(-1.0, immediate=True)
+        while True:
+            time.sleep(.01)
+    except KeyboardInterrupt:
+        motors["dribbler"].set_speed(0, immediate=True)
