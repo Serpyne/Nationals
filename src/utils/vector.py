@@ -50,8 +50,8 @@ class Vector:
         return Vector(self.xy[0] / scalar, self.xy[1] / scalar)
     def int(self) -> "Vector":
         return Vector(int(self.xy[0]), int(self.xy[1]))
-    def __tuple__(self) -> tuple[float, float]:
-        return self.xy
+    def as_tuple(self) -> tuple[float, float]:
+        return (self.xy[0], self.xy[1])
 
     def magnitude(self) -> float:
         return sqrt(self.magnitude_squared())
@@ -59,7 +59,7 @@ class Vector:
         return self.xy[0]**2 + self.xy[1]**2
     
     def direction(self) -> float:
-        return degrees(self.direction_radians)
+        return degrees(self.direction_radians())
     def direction_radians(self) -> float:
         return atan2(self.xy[1], self.xy[0])
             

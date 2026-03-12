@@ -10,8 +10,8 @@ from .communication import BT, Message, STATES
 from .states import Goal, Mode, State, ShootingStyle
 from .robot_vars import RobotVars
 from .utilities import Utilities
-from .blackboard import Blackboard
-from .utils.helpers import clamp_lerp, smooth_linear, in_range, out_of_bounds_function
+from .blackboard import Blackboard, NUM_SAMPLES
+from .utils.helpers import clamp_lerp, smooth_linear, in_range, out_of_bounds_function, MAX_ROTATION
 
 from screeninfo import get_monitors
 
@@ -26,8 +26,6 @@ from pathlib import Path
 import cv2
 import numpy as np
 from threading import Thread
-
-MAXROT = 0.9
 
 class Robot:
     def __init__(self):
@@ -64,7 +62,7 @@ class Robot:
         self.utils.switch_left = Button(self.config["addresses"]["switchLeft"], pull_up=False)
         self.utils.switch_right = Button(self.config["addresses"]["switchRight"], pull_up=False)
         
-        self.mode: int = Mode.Idle
+        self.mode: str = Mode.Idle
         self.state: str = State.KickOff # State.Chasing
         self.previous_state: str = State.Chasing
         self.bb = Blackboard()
@@ -139,6 +137,8 @@ class Robot:
         return normalise(angle_lerp(angle, mapped_angle, f(distance)))
 
     async def drive_in_direction(self, angle: float, speed: float, contribution: float = 1.0, immediate: bool = False):
+        if self.utils.motors is None: return
+
         if speed < 0:
             angle = normalise(angle + 180)
             speed = -speed
@@ -197,7 +197,7 @@ class Robot:
         self.bb.currDrive[0] = angle_lerp(self.bb.currDrive[0], angle, 0.1)
         self.bb.currDrive[1] = lerp(self.bb.currDrive[1], speed, 0.1)
         
-        await self.drive_in_direction(*self.bb.currDrive, contribution)
+        await self.drive_in_direction(*self.bb.currDrive, contribution=contribution)
         
     async def lerp_turn(self, angle, contribution=0.5):
         if abs(angle) > 180: angle = normalise(angle)
@@ -205,7 +205,7 @@ class Robot:
         self.bb.currTurn = angle_lerp(self.bb.currTurn, angle, 0.05)
         
         await self.turn(self.bb.currTurn, contribution)
-    
+
     async def turn(self, speed: float, contribution: float = 1.0, immediate: bool = False):
         for i in range(4):
             if not immediate:
@@ -281,7 +281,7 @@ class Robot:
             else:
                 await self.stop_dribbler()
     
-        if self.state == State.Blind:
+        if self.state == State.Blind and self.utils.camera is not None:
             """
             Centre on the field horizontally
             """
@@ -302,7 +302,7 @@ class Robot:
             else:
                 await self.drive_in_direction(180 + self.vars.heading, self.vars.drive_speed, 1.0)
         
-            await self.turn(clamp(-smooth_linear(self.vars.heading, a = 640) * self.vars.maintain_orientation_speed, -MAXROT, MAXROT), 1.0)
+            await self.turn(clamp(-smooth_linear(self.vars.heading, a = 640) * self.vars.maintain_orientation_speed, -MAX_ROTATION, MAX_ROTATION), 1.0)
             
             # Center yourself
             a = normalise(localisation_angle - self.vars.heading + 180)
@@ -366,7 +366,7 @@ class Robot:
             # !!!!!
             # !!!!!
             # !!!!!
-                # ~ if abs(normalise(self.vars.heading)) <= 90 and self.vars.ball_distance is not None:
+                if abs(normalise(self.vars.heading)) <= 90 and self.vars.ball_distance is not None:
                     # If ball is close enough, face to collect it
                     
                     # ~ cond = self.vars.ball_distance > 45 and abs(normalise(self.vars.ball_angle)) > 125
@@ -381,7 +381,7 @@ class Robot:
                         angle = angle_lerp(turnAngle, self.vars.heading, t)
                         await self.turn(clamp(-smooth_linear(angle, a = 800) * 0.004, -0.12, 0.12), 1.0)
                     else:
-                        await self.turn(clamp(-smooth_linear(self.vars.heading, a = 1000) * self.vars.maintain_orientation_speed, -MAXROT, MAXROT), 1.0)
+                        await self.turn(clamp(-smooth_linear(self.vars.heading, a = 1000) * self.vars.maintain_orientation_speed, -MAX_ROTATION, MAX_ROTATION), 1.0)
                         
                     direction = self.calculate_final_direction(self.vars.normalised_ball_angle, self.vars.ball_distance)
                     direction = self.drive_direction_bias(direction, self.vars.ball_distance)
@@ -397,14 +397,14 @@ class Robot:
                         facing_factor = 0.5 + 0.5 * math.cos(math.radians(abs(normalise(self.vars.ball_angle))))
                         # ~ facing_factor = 0 + 1 * facing_factor
                     await self.drive_in_direction(direction + self.vars.heading, speed * facing_factor, contribution = 1.0)
-                # If backward, i.e. if we lost the ball after trying to shoot.
+                    # If backward, i.e. if we lost the ball after trying to shoot.
                 else:
                     # If the ball is behind us
                     if abs(self.vars.ball_angle) > 90:
-                        await self.turn(clamp(-smooth_linear(self.vars.heading, a = 1200) * self.vars.maintain_orientation_speed, -MAXROT, MAXROT), 1.0)
+                        await self.turn(clamp(-smooth_linear(self.vars.heading, a = 1200) * self.vars.maintain_orientation_speed, -MAX_ROTATION, MAX_ROTATION), 1.0)
                     # if the ball is in front, collect it directly without turning first
                     else:
-                        await self.turn(clamp(-smooth_linear(self.vars.ball_angle, a = 1200) * 0.02, -MAXROT, MAXROT), contribution=1.0)
+                        await self.turn(clamp(-smooth_linear(self.vars.ball_angle, a = 1200) * 0.02, -MAX_ROTATION, MAX_ROTATION), contribution=1.0)
                         # ~ direction = self.calculate_final_direction(self.vars.ball_angle, self.vars.ball_distance)
                         # ~ direction = self.drive_direction_bias(direction, self.vars.ball_distance)
                         direction = self.vars.ball_angle
@@ -493,7 +493,7 @@ class Robot:
                     ga = normalise(attackingAngle - self.vars.heading)
                     if self.bb.attackingGoalTicks <= 5:
                         await self.enable_dribbler(1)
-                        await self.turn(clamp(-normalise(self.vars.heading + 180) * 0.005, -MAXROT, MAXROT), 0.5)
+                        await self.turn(clamp(-normalise(self.vars.heading + 180) * 0.005, -MAX_ROTATION, MAX_ROTATION), 0.5)
                         await self.drive_in_direction(angle_lerp(0 + self.vars.heading, attackingAngle, 0.3), self.vars.dribble_speed, 1.0)
                         await self.confirm_drive()
                     else:
@@ -577,7 +577,7 @@ class Robot:
                 speed = self.vars.center_speed * smooth_linear((a + 90) % 180 - 90, a = 670)
                 if abs(a) >= 90: speed *= -1
                 await self.drive_in_direction(self.vars.heading - 90, speed, 0.2)
-                await self.turn(clamp(-smooth_linear(self.vars.heading, a = 640) * self.vars.maintain_orientation_speed, -MAXROT, MAXROT), 1.0)
+                await self.turn(clamp(-smooth_linear(self.vars.heading, a = 640) * self.vars.maintain_orientation_speed, -MAX_ROTATION, MAX_ROTATION), 1.0)
                 
             else:
                 # Position between ball and goal
@@ -598,7 +598,7 @@ class Robot:
                     if abs(a) >= 90: speed *= -1
                     await self.drive_in_direction(self.vars.heading + 90, clamp(speed, -1, 1), 1.0)
                 
-                await self.turn(clamp(-smooth_linear(self.vars.heading, a = 410) * self.vars.maintain_orientation_speed, -MAXROT, MAXROT), 1.0)
+                await self.turn(clamp(-smooth_linear(self.vars.heading, a = 410) * self.vars.maintain_orientation_speed, -MAX_ROTATION, MAX_ROTATION), 1.0)
             
                 # This will be for the goalie
                 if self.bb.kickedTicks <= 0:
@@ -644,7 +644,7 @@ class Robot:
                 
             kickoffTimer -= 1
             
-            await self.turn(clamp(-smooth_linear(self.vars.heading, a = 640) * self.vars.maintain_orientation_speed, -MAXROT, MAXROT), 1.0)
+            await self.turn(clamp(-smooth_linear(self.vars.heading, a = 640) * self.vars.maintain_orientation_speed, -MAX_ROTATION, MAX_ROTATION), 1.0)
                 
             if self.vars.ball_angle is not None:
                 await self.drive_in_direction(self.vars.ball_angle, self.vars.drive_speed, 1.0)
@@ -838,7 +838,7 @@ class Robot:
                     self.bb.ballSpeed = math.sqrt(pow(dx, 2) + pow(dy, 2))
                 else:
                     self.bb.ballSpeed = None
-                self.vars.ball_angle = normalise(self.utils.camera.angle) #Q+ self.vars.cameraOrientation)
+                self.vars.ball_angle = normalise(self.utils.camera.angle)
                 self.vars.ball_distance = self.utils.camera.distance
             
             # Setting blackboard variables

@@ -14,53 +14,53 @@ class Blackboard:
     atAttackingGoal: bool = False
     atAttackingGoalTicks: int = 0
     goalTicks: int = 0
-    xPositionTOF: float = None
-    xPosition: float = None
-    yPosition: float = None
+    xPositionTOF: float | None = None
+    xPosition: float | None = None
+    yPosition: float | None = None
     kickoffDuration: float = 2000
     kickoffTimer: float = 0
-    targetDirection: float = None
+    targetDirection: float | None = None
     previousTargetDirection: float = 180
     leavingGoal: bool = False
-    returnToGoalThreshold: bool = 80.0
+    returnToGoalThreshold: float = 80.0
     
     inFrontOfBallTicks: int = 0
     
-    attackingAngle: float = None
-    attackingDistance: float = None
+    attackingAngle: float | None = None
+    attackingDistance: float | None = None
     pastAttackingAngles: list[float] = np.zeros(1 + NUM_SAMPLES, dtype=np.int32)
     pastAttackingDistances: list[float] = np.zeros(1 + NUM_SAMPLES, dtype=np.int32)
-    meanAttackingAngle: float = None
-    meanAttackingDistance: float = None
+    meanAttackingAngle: float | None = None
+    meanAttackingDistance: float | None = None
     pastDefendingDistances: list[float] = np.zeros(1 + NUM_SAMPLES, dtype=np.int32)
-    meanDefendingDistance: float = None
-    defendingAngle: float = None
-    defendingDistance: float = None
+    meanDefendingDistance: float | None = None
+    defendingAngle: float | None = None
+    defendingDistance: float | None = None
     
-    attackingWidth: float = None
+    attackingWidth: float | None = None
     
     pastGlobalAttackingAngles: list[float] = np.zeros(1 + NUM_SAMPLES, dtype=np.int32)
-    meanGlobalAttackingAngle: float = None
+    meanGlobalAttackingAngle: float | None = None
     
-    lastYellowAngle: float = None
-    lastYellowDistance: float = None
-    lastBlueAngle: float = None
-    lastBlueDistance: float = None
+    lastYellowAngle: float | None = None
+    lastYellowDistance: float | None = None
+    lastBlueAngle: float | None = None
+    lastBlueDistance: float | None = None
     
-    cameraOrientation: float = None
+    cameraOrientation: float | None = None
     capturedSpeed: float = 0
     isKicking: bool = False
     kickedTicks: int = 0
     currTurn: float = 0
-    currDrive = [0, 0]
+    currDrive: list[float, float] = [0, 0]
     lastNormal = None
     normal: list = [0, 0]
     shootingStyle: int = ShootingStyle.Clear
     atSideTicks: int = 0
     hideBallThreshold = 0.80
     collectingBallTicks: int = 0
-    lastDriveDir: float = None
-    lastDriveSpeed: float = None
+    lastDriveDir: float | None = None
+    lastDriveSpeed: float | None = None
     isDribbling: bool = False
     strafeDirection: float = 90
     isStrafing: bool = False

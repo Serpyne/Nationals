@@ -4,7 +4,7 @@ Utility helper functions
 
 from ..vision.cam import clamp, sign
 
-MAXROT = 0.9
+MAX_ROTATION = 0.9
 
 def clamp_lerp(x, a, b):
     """Clamped linear interpolation"""
