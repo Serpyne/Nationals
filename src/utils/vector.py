@@ -63,6 +63,14 @@ class Vector:
     def direction_radians(self) -> float:
         return atan2(self.xy[1], self.xy[0])
             
+def lerp(a: float, b: float, step: float = .1) -> float:
+    """Linear interpolation between a and b by step"""
+    return a + (b - a) * step
+
+def dist_squared(a: "Vector", b: "Vector") -> float:
+    """Squared distance between two vectors"""
+    return (a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2
+
 if __name__ == "__main__":
     print(Vector(0, 0))
     print(Vector((0, 0)))

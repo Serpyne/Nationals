@@ -1,6 +1,6 @@
 from gpiozero import DigitalOutputDevice
 from time import sleep
-from motors_i2c import Motor
+from .motors import Motor
 import asyncio
 
 from pathlib import Path

@@ -1,8 +1,8 @@
 import tkinter as tk
 from tkinter import ttk
 from RangeSlider.RangeSlider import RangeSliderH
-from compass import Compass
-from cam import normalise, calculate_distance, angle_lerp, lerp
+from ..hardware.compass import Compass
+from ..vision.cam import normalise, calculate_distance, angle_lerp, lerp
 
 from picamera2 import Picamera2
 import cv2
@@ -15,7 +15,7 @@ from time import perf_counter as now, sleep
 import sys
 import math
 
-from masks import *
+from ..vision.masks import *
 
 
 

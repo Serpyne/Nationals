@@ -11,7 +11,7 @@ import math
 from colorsys import hsv_to_rgb
 from screeninfo import get_monitors
 
-from masks import *
+from .masks import *
 
 def delta_colour(a: np.array, b: np.array):
     a = a.astype('float32')
@@ -22,8 +22,8 @@ def delta_colour(a: np.array, b: np.array):
     
     return np.linalg.norm(lab1 - lab2, axis=-1)
 
-def calculate_distance(radial_distance: float, a: float = 788225.001, b: float = 238685.681) -> float:
-    return pow(a / (radial_distance * pow(4/3, 2) - b), 2)
+def calculate_distance(radial_distance: float, a: float = 340704.653, b: float = 107793.842) -> float:
+    return pow(a / (radial_distance - b), 2)
     
 def normalise(angle_degrees: float) -> float:
     return (angle_degrees + 180) % 360 - 180
@@ -123,9 +123,9 @@ class AsyncCam:
             raw=self.stream.sensor_modes[2],
             buffer_count=6,
             controls={
-                "FrameRate": 50.0, #120.05,
+                "FrameRate": 120.0, #120.05,
                 "Contrast": 1.0,
-                "ScalerCrop": (0, 0, 4056, 3040)
+                "ScalerCrop": (967, 567, 2122, 2122)
             },
         ))
         self.stream.controls.ExposureTime = self.controls["ExposureTime"]
@@ -153,10 +153,12 @@ class AsyncCam:
             self.field_hue.reverse()
         self.hands = ColorRange(colours["hands"][:3], colours["hands"][3:])
         
-        self.ray_num = 10
-        self.ray_mag = 5
-        self.ray_initial_radius = 100
-        self.body_radius = 160
+        self.ray_num = 14
+        self.ray_mag = 9
+        self.ray_initial_radius = 90
+        self.body_radius = 140
+        self.steps = 26
+        self.hue_threshold = 59
         self.hits = np.zeros(self.ray_num, dtype=np.float32)
 
         self.debug: bool = False
@@ -168,6 +170,8 @@ class AsyncCam:
         self.yellow_distance: float = None
         self.blue_angle: float = None
         self.blue_distance: float = None
+        self.yellow_width = None
+        self.blue_width = None
         
         self.body_masks = []
         if "cameraMasks" in self.config:
@@ -248,9 +252,11 @@ class AsyncCam:
         if conglomerate is None:
             self.yellow_angle = None
             self.yellow_distance = None
+            self.yellow_width = None
         else:
         
             M = cv2.moments(conglomerate)
+            
             centroid = [M['m10'] // M['m00'], M['m01'] // M['m00']]
             
             dx, dy = centroid[0] - self.center[0], centroid[1] - self.center[1]
@@ -262,6 +268,8 @@ class AsyncCam:
             if self.yellow_distance is None: self.yellow_distance = true_distance
             self.yellow_distance = lerp(self.yellow_distance, true_distance, t = 0.67)
         
+            self.yellow_width = abs(cv2.minAreaRect(conglomerate)[1][0])
+            
             if self.debug:
                 cv2.drawContours(frame, contours, -1, (0, 220, 0), 1)
                 cv2.drawContours(frame, [conglomerate], 0, (255, 255, 255))
@@ -278,6 +286,7 @@ class AsyncCam:
         if conglomerate is None:
             self.blue_angle = None
             self.blue_distance = None
+            self.blue_width = None
             return
         
         M = cv2.moments(conglomerate)
@@ -292,6 +301,8 @@ class AsyncCam:
         if self.blue_distance is None: self.blue_distance = true_distance
         self.blue_distance = lerp(self.blue_distance, true_distance, t = 0.67)
         
+        self.blue_width = abs(cv2.minAreaRect(conglomerate)[1][0])
+            
         if self.debug:
             cv2.drawContours(frame, contours, -1, (0, 220, 0), 1)
             cv2.drawContours(frame, [conglomerate], 0, (255, 255, 255))
@@ -305,34 +316,49 @@ class AsyncCam:
         if frame is None:
             frame = self.current_frame
             
-        # ~ frame = cv2.circle(frame, [296, 314], 350, (0, 0, 0), 50)
+        frame = cv2.circle(frame, (291, 297), 318, (0, 0, 0), 46)
         
         hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
         self.draw_body_masks(hsv, filled=True)
 
         self.hits = np.zeros(self.ray_num, dtype=np.float32)
-        for i, ray_angle in enumerate(range(0, 359, 360 // self.ray_num)):
+        for i, ray_angle in enumerate(range(0, 359, 360 // self.ray_num)[:self.ray_num]):
             vec = [math.cos(math.radians(ray_angle)), math.sin(math.radians(ray_angle))]
             pos = [self.center[0] + self.ray_initial_radius * vec[0], self.center[1] + self.ray_initial_radius * vec[1]]
             started = False
             initial_colour = hsv[int(pos[1]), int(pos[0]), :3]
             
-            for c in range(36):
+            for c in range(50):
                 pos[0] += self.ray_mag * vec[0]
                 pos[1] += self.ray_mag * vec[1]
                 
-                colour = hsv[int(pos[1]), int(pos[0]), :3]
-                if colour.all() != initial_colour.all() or c * self.ray_mag > self.body_radius - self.ray_initial_radius:
-                    started = True
-                    initial_colour = colour.copy()
+                ix, iy = int(pos[1]), int(pos[0])
+                try:
+                    if ix < 0 or ix >= frame.shape[1] or iy < 0 or iy >= frame.shape[0]:
+                        if self.debug: cv2.drawMarker(frame, (clamp(ix, 0, frame.shape[1] - 1), clamp(iy, 0, frame.shape[0] - 1)), (0, 20, 255))
+                        self.hits[i] = calculate_distance(pow(pos[0] - self.center[0], 2) + pow(pos[1] - self.center[1], 2))
+                        break
+                        
+                    colour = hsv[ix, iy, :3]
+                    if colour.all() != initial_colour.all() or c * self.ray_mag > self.body_radius - self.ray_initial_radius:
+                        started = True
+                        initial_colour = colour.copy()
+                        
+                    if not started: continue
                     
-                if not started: continue
-                
-                if (colour[2] < 30):
-                # ~ if abs(int(initial_colour[0]) - colour[0]) > 5 or (colour[2] < 30):
-                # ~ if abs(int(initial_colour[0]) - colour[0]) > 5 or (colour[0] > self.field_hue[1] or colour[0] < self.field_hue[0]):
-                    if self.debug: cv2.drawMarker(frame, (int(pos[0]), int(pos[1])), (0, 255, 0))
-                    self.hits[i] = calculate_distance(pow(pos[0] - self.center[0], 2) + pow(pos[1] - self.center[1], 2))
+                    if (colour[2] < self.hue_threshold):
+                        ny, nx = int(pos[1] + 12 * vec[1]), int(pos[0] + 12 * vec[0])
+                        if nx < 0 or nx >= frame.shape[1] or ny < 0 or ny >= frame.shape[0]:
+                            break
+                        else:
+                            if hsv[ny, nx, :3][2] < self.hue_threshold:
+                                if self.debug: cv2.drawMarker(frame, (int(pos[0]), int(pos[1])), (0, 255, 0))
+                                self.hits[i] = calculate_distance(pow(pos[0] - self.center[0], 2) + pow(pos[1] - self.center[1], 2))
+                                breaks
+                except:
+                    # ~ print(ix, iy)
+                    # ~ if self.debug: cv2.drawMarker(frame, (clamp(ix, 0, frame.shape[1] - 1), clamp(iy, 0, frame.shape[0] - 1)), (0, 20, 255))
+                    # ~ self.hits[i] = calculate_distance(pow(pos[0] - self.center[0], 2) + pow(pos[1] - self.center[1], 2))
                     break
         
         if self.debug:
