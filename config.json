@@ -1,0 +1,250 @@
+{
+    "ExposureTime": 11248,
+    "OLDanglePolyCoefficients": {
+        "x1": 3.204,
+        "x2": 0.01556,
+        "x3": -0.0009267,
+        "x4": 8.243e-06,
+        "x5": -2.124e-08
+    },
+    "Saturation": 1.8,
+    "addresses": {
+        "captureTof": 87,
+        "dribbler": 31,
+        "motors": [
+            25,
+            26,
+            27,
+            28
+        ],
+        "switchLeft": 22,
+        "switchMiddle": 27,
+        "switchRight": 17,
+        "tofs": null
+    },
+    "anglePolyCoefficients": {
+        "x1": 3.76559,
+        "x2": -0.0628893,
+        "x3": 0.00113313,
+        "x4": -1.37713e-05,
+        "x5": 8.38426e-08,
+        "x6": -1.87138e-10
+    },
+    "backingDistance": 62.0,
+    "blindnessTimer": 200,
+    "cameraMasks": [
+        {
+            "center": [
+                288,
+                302
+            ],
+            "colour": [
+                50,
+                50,
+                255
+            ],
+            "endAngle": 330,
+            "radius": 142,
+            "startAngle": 30,
+            "type": "sector"
+        },
+        {
+            "center": [
+                290,
+                302
+            ],
+            "colour": [
+                255,
+                100,
+                50
+            ],
+            "endAngle": 330,
+            "radius": 130,
+            "startAngle": 30,
+            "type": "sector"
+        },
+        {
+            "center": [
+                288,
+                302
+            ],
+            "colour": [
+                255,
+                255,
+                255
+            ],
+            "radius": 67,
+            "type": "circle"
+        },
+        {
+            "colour": [
+                50,
+                120,
+                220
+            ],
+            "h": 120,
+            "type": "rect",
+            "w": 115,
+            "x": 300,
+            "y": 240
+        }
+    ],
+    "cameraOrientation": 180,
+    "center": [
+        288,
+        302
+    ],
+    "colours": {
+        "ball": [
+            0,
+            171,
+            126,
+            7,
+            255,
+            254
+        ],
+        "blue": [
+            94,
+            220,
+            89,
+            119,
+            255,
+            215
+        ],
+        "field": [
+            19,
+            31,
+            68,
+            128,
+            255,
+            138
+        ],
+        "hands": [
+            7,
+            182,
+            198,
+            24,
+            255,
+            255
+        ],
+        "lines": [
+            68,
+            63,
+            67,
+            87,
+            255,
+            194
+        ],
+        "yellow": [
+            23,
+            237,
+            83,
+            54,
+            255,
+            255
+        ]
+    },
+    "corners": {
+        "BottomLeft": {
+            "blue": {
+                "angle": 110.99494745011096,
+                "dist": 45.96148159762844
+            },
+            "front": "yellow",
+            "yellow": {
+                "angle": 17.257547943360578,
+                "dist": 96.75602631923866
+            }
+        },
+        "BottomRight": {
+            "blue": {
+                "angle": -121.01353981250728,
+                "dist": 46.880504804994445
+            },
+            "front": "yellow",
+            "yellow": {
+                "angle": -20.056262205702126,
+                "dist": 96.1386089731155
+            }
+        },
+        "TopLeft": {
+            "blue": {
+                "angle": 162.9252201772594,
+                "dist": 122.91966773795299
+            },
+            "front": "yellow",
+            "yellow": {
+                "angle": 58.47309194775359,
+                "dist": 42.42252276606019
+            }
+        },
+        "TopRight": {
+            "blue": {
+                "angle": -165.50957940512004,
+                "dist": 108.57214766850188
+            },
+            "front": "yellow",
+            "yellow": {
+                "angle": -66.07036720468321,
+                "dist": 40.36878800522579
+            }
+        }
+    },
+    "directionBias": 1000200100,
+    "id": "TS-chopped",
+    "maintainOrientationTurnSpeed": 0.05,
+    "settings": {
+        "ball": {
+            "maximum_span": 34.1,
+            "minimum_conglomerate": 10,
+            "minimum_contour_size": 1
+        },
+        "blue": {
+            "maximum_span": 0.1,
+            "minimum_conglomerate": 11,
+            "minimum_contour_size": 30
+        },
+        "field": {
+            "maximum_span": 11.9,
+            "minimum_conglomerate": 44,
+            "minimum_contour_size": 30
+        },
+        "hands": {
+            "maximum_span": 131.0,
+            "minimum_conglomerate": 10,
+            "minimum_contour_size": 6
+        },
+        "lines": {
+            "maximum_span": 199.0,
+            "minimum_conglomerate": 10,
+            "minimum_contour_size": 23
+        },
+        "yellow": {
+            "maximum_span": 38.1,
+            "minimum_conglomerate": 10,
+            "minimum_contour_size": 30
+        }
+    },
+    "speedBias": {
+        "forwardDamping": 0.1,
+        "sideDamping": 0.35
+    },
+    "speedCenter": 0.0035,
+    "speedDribble": 0.2,
+    "speedDrive": 1,
+    "speedMax": 1,
+    "targetGoal": "yellow",
+    "tofPositions": [
+        36,
+        108,
+        180,
+        252,
+        324
+    ],
+    "wheelPositions": [
+        0,
+        1,
+        2,
+        3
+    ]
+}

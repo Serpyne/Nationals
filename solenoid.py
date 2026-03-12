@@ -1,0 +1,82 @@
+from gpiozero import DigitalOutputDevice
+from time import sleep
+from motors_i2c import Motor
+import asyncio
+
+from pathlib import Path
+import json
+import math
+
+
+
+class Solenoid:
+    def __init__(self, activation_pin: int):
+        self.pin = activation_pin
+        self.device = DigitalOutputDevice(self.pin, active_high=False, initial_value=False)
+        
+    async def shoot(self):
+        self.device.on()
+        await asyncio.sleep(0.05)
+        self.device.off()
+        await asyncio.sleep(0.1)
+
+
+
+# For testing that the kicker won't exceed the maximum power.
+# A pass is when the robot is placed in the backleft corner of the defending goal
+# and kicked into the attacking goal, the ball bounces off the back of the goal and sits in the penalty area.
+
+if __name__ == "__main__":
+    s = Solenoid(23)
+    m = Motor(0x1F, max_speed = 280_000_000)
+    motors = {
+        0: Motor(25),
+        1: Motor(26),
+        2: Motor(27),
+        3: Motor(28)
+    }
+    
+    def drive(angle, speed, contribution = 1):
+        FL = math.sin(math.radians(35 - angle))
+        FR = math.sin(math.radians(35 + angle))
+
+        if abs(FL) >= abs(FR):
+            FR = (speed / abs(FL)) * FR
+            FL = (speed / FL) * abs(FL)
+        elif abs(FL) < abs(FR):
+            FL = (speed / abs(FR)) * FL
+            FR = (speed / FR) * abs(FR)
+
+        motors[0].set_speed(FL * contribution, immediate=True)
+        motors[1].set_speed(FR * contribution, immediate=True)
+        motors[2].set_speed(-FL * contribution, immediate=True)
+        motors[3].set_speed(-FR * contribution, immediate=True)
+
+    runMotors = 0
+    m.set_speed(0, True)
+
+    async def main():
+        speed = 0.5
+        # ~ [motors[i].set_speed(0.15, True) for i in range(4)]
+        drive(0, 0.001)
+        
+        while True:
+            if runMotors: m.set_speed(-1, True)
+            # ~ drive(0, speed)
+            # ~ speed -= 0.1
+            # ~ speed = max(-1.0, speed)
+            
+            await asyncio.sleep(0.1)
+            input()
+            
+            if runMotors: m.set_speed(0.5, True)
+            await asyncio.sleep(0.15)
+            await s.shoot()
+                
+            await asyncio.sleep(0.1)
+    
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        m.set_speed(0, True)
+        [motors[i].set_speed(0, 1) for i in range(4)]
