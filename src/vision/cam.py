@@ -52,7 +52,7 @@ def convert_hsv(hsv: tuple, format_: str = "rgb") -> tuple:
     return ret
 
 def load_config(filename="config.json") -> dict:
-    with open(Path(__file__).parent / filename, "r") as f:
+    with open(Path(__file__).parent.parent / "config" / filename, "r") as f:
         data = json.load(f)
         f.close()
     return data

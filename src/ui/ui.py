@@ -1,26 +1,25 @@
 import tkinter as tk
 from tkinter import ttk
 from RangeSlider.RangeSlider import RangeSliderH
-from ..hardware.compass import Compass
+from ..hardware import Compass
+
 from ..vision.cam import normalise, calculate_distance, angle_lerp, lerp
+from ..vision.masks import *
 
 from picamera2 import Picamera2
+
 import cv2
 import numpy as np
-
 import asyncio
 import json
+
 from pathlib import Path
 from time import perf_counter as now, sleep
 import sys
 import math
 
-from ..vision.masks import *
-
-
-
 def load_config(filename="config.json") -> dict:
-    with open(Path(__file__).parent / filename, "r") as f:
+    with open(Path(__file__).parent.parent / ("config/" + filename), "r") as f:
         data = json.load(f)
         f.close()
     return data

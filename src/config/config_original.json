@@ -230,9 +230,9 @@
         "sideDamping": 0.35
     },
     "speedCenter": 0.0035,
-    "speedDribble": 0.001,
-    "speedDrive": 0.01,
-    "speedMax": 0.01,
+    "speedDribble": 0.2,
+    "speedDrive": 1,
+    "speedMax": 1,
     "targetGoal": "yellow",
     "tofPositions": [
         36,

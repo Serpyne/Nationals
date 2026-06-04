@@ -7,7 +7,7 @@ from pathlib import Path
 import json
 import math
 
-
+from gpiozero import LED
 
 class Solenoid:
     def __init__(self, activation_pin: int):
@@ -52,31 +52,45 @@ if __name__ == "__main__":
         motors[2].set_speed(-FL * contribution, immediate=True)
         motors[3].set_speed(-FR * contribution, immediate=True)
 
-    runMotors = 0
+    runMotors = 1
+    DRIBBLER_SPEED = 1
+    
     m.set_speed(0, True)
 
+    status_light = LED(26)
+    
     async def main():
         speed = 0.5
         # ~ [motors[i].set_speed(0.15, True) for i in range(4)]
-        drive(0, 0.001)
+        # ~ drive(0, 0.001)
         
+        ticks = 90
+        angle = 90
         while True:
-            if runMotors: m.set_speed(-1, True)
-            # ~ drive(0, speed)
+            if runMotors: m.set_speed(-DRIBBLER_SPEED, True)
+            
+            # ~ if ticks % 110 == 0:
+                # ~ angle += 180
+            # ~ ticks += 1
+            # ~ drive(angle, .35)
             # ~ speed -= 0.1
             # ~ speed = max(-1.0, speed)
             
             await asyncio.sleep(0.1)
             input()
             
+            status_light.on()
+            
             if runMotors: m.set_speed(0.5, True)
             await asyncio.sleep(0.15)
             await s.shoot()
                 
             await asyncio.sleep(0.1)
+            status_light.off()
     
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
+        status_light.off()
         m.set_speed(0, True)
         [motors[i].set_speed(0, 1) for i in range(4)]

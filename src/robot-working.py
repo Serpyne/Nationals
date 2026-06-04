@@ -819,8 +819,7 @@ class Robot:
         
             
         # Sync up the robot event loop with the camera output
-        # ~ async for raw_frame in self.utils.camera.main():
-        for 
+        async for raw_frame in self.utils.camera.main():
 
             curr = now()
             self.dt = (curr - self.prev) * 1000
