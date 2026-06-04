@@ -30,3 +30,14 @@ The file at [ui.py](ui.py) contains the interface for colour, exposure and satur
 
 # Robot Script File
 We run [robot.py](robot.py) before each match, then a three-way switch selects the different modes: Calibration, Idle, Running
+
+## Reflection
+Team TS has gone through a two-year journey, starting in Feburary 2024 up until October 2025.
+
+In 2024, my team used a Raspberry Pi 5 with a PiCamera Module 3 for computer vision, and computing the ball angle and distance to send to a Raspberry Pi Pico (via UART serial data) which handled the ball chasing logic and controlling of motor signals. The setup was limited by an unstable communication between the two microcontrollers, whose data was corrupted by either the power that the motors required when enabled or interference from the other I2C components; we never figured it out.
+
+Regardless, we were able to win Victorian States Open Soccer 2024 in an intense grandfinal against JMSS' only team, albeit being rather hilarious at times since more than half of the game was spent watching both the home and away teams miss the ball or drive in circles to find it.
+
+Thus, at the beginning of 2025, we decided to revamp our entire setup by removing the Raspberry Pi Pico and voiding the redundancy of the UART connection, whose corrupted data make gameplay **completely** impossible. We also moved from a Python -> C/C++ environment to completely Python so that the vision and motor modules operated at the same refresh rate. We in turn found success with this setup as there were no issues meshing all of the modules together, and the blunt of problems arose from hardware issues (dribbler sucked, baseplate was too low so it got stuck on certain parts of the field, robot walls to high so when the ball was flush against the robot, our camera could not see any orange).
+
+For the majority of development we had a working movement system (moving the baseplate up provided better contact with the ground and so the robot wouldn't lose orientation) and a sufficiently adequate dribbler (ball would slip out when it rotated). Then, in the rush to get a robot working for the nationals competition in October, our team members worked day and night to put the solenoid and bluetooth modules in and get everything working. There would be errors that were un-reproducable that made development **extremely** annoying, but we eventually got it done and came out undefeated after two days of competition in Canberra.
